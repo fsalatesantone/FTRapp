@@ -1,0 +1,10 @@
+streamlit=1.45.1
+numpy=2.2.4
+pandas=2.2.3
+matplotlib=3.10.3
+seaborn=0.13.2
+xgboost=3.0.5
+shap=0.49.1
+plotly=6.2.0
+scikit-learn=1.7.1
+xlsxwriter=3.2.5
