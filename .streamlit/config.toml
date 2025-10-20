@@ -1,0 +1,6 @@
+[theme]
+primaryColor="#41a4ff"        # Azzurro (per bottoni, slider e multiselection highlight)
+backgroundColor="#FFFFFF"     # Sfondo principale bianco (Tema chiaro)
+secondaryBackgroundColor="#F0F2F6" # Sfondo secondario (box, sidebar, ecc.)
+textColor="#003a70"           # Blu scuro (per testo e titoli, per enfasi)
+font="sans serif"
