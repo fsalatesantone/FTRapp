@@ -222,7 +222,7 @@ def train_and_shap(df):
         'X_with_ranking': X_with_ranking, 
         'shap_values_extended': shap_values_extended
     }
-    st.success("Modello XGBoost addestrato e valori SHAP calcolati con successo!")
+    st.success("Modello XGBoost addestrato con successo!")
 
 
 def pretrain_and_shap(df):
@@ -297,7 +297,7 @@ def pretrain_and_shap(df):
         'X_with_ranking': X_with_ranking, 
         'shap_values_extended': shap_values_extended
     }
-    st.success("Modello XGBoost caricato e valori SHAP calcolati con successo!")
+    st.success("Modello XGBoost caricato con successo!")
 
 
 # --- Funzioni di Plotting (Rimosse decorazioni e logica di caricamento) ---
@@ -605,7 +605,7 @@ with tab_modello:
         # Bottone per addestrare il modello
         col_bottone1, col_bottone2, col_empty = st.columns([1, 1, 4])
         with col_bottone1:
-            if st.button("🚀 Avvia Addestramento del Modello da zero"):
+            if st.button("🚀 Avvia addestramento del modello"):
                 with st.spinner("Addestramento in corso... (potrebbe richiedere qualche minuto)"):
                     train_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
                 # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
