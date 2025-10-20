@@ -9,3 +9,4 @@ plotly==6.2.0
 scikit-learn==1.7.1
 xlsxwriter==3.2.5
 openpyxl==3.1.5
+joblib==1.5.1

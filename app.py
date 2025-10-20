@@ -12,6 +12,7 @@ from sklearn.model_selection import KFold, cross_val_score
 from sklearn.metrics import mean_squared_error, r2_score
 import plotly.express as px
 import plotly.graph_objects as go
+import joblib
 
 # --- Configurazione Iniziale di Streamlit ---
 st.set_page_config(layout="wide", page_title="Analisi Ranking FT (SHAP)")
@@ -222,6 +223,81 @@ def train_and_shap(df):
         'shap_values_extended': shap_values_extended
     }
     st.success("Modello XGBoost addestrato e valori SHAP calcolati con successo!")
+
+
+def pretrain_and_shap(df):
+    """Carica il modello pre-addestrato di XGBoost e calcola i valori SHAP. Salva in session_state."""
+    random_seed = 3
+    
+    # Prepara i dati
+    # Assumiamo che tutte le colonne numeriche tranne 'ranking_score' siano feature
+    feature_cols_all = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'ranking_score']
+    # Rimuovi anche 'location' che è categorica ma a volte può essere interpretata come numerica se ha valori numerici
+    feature_cols = [c for c in feature_cols_all if c not in ['name', 'location']] 
+    
+    # Rimuovi righe con NaN nelle colonne feature o target
+    df_clean = df.dropna(subset=feature_cols + ['ranking_score'])
+    
+    X = df_clean[feature_cols].values
+    y = df_clean['ranking_score'].values
+    
+    # Carica i risultati della CV
+    cv_scores_r2 = np.load("./data/cv_scores_r2.npy")
+    cv_scores_rmse = np.load("./data/cv_scores_rmse.npy")
+
+    cv_results = {
+        'R2_mean': cv_scores_r2.mean(),
+        'R2_std': cv_scores_r2.std(),
+        'RMSE_mean': cv_scores_rmse.mean(),
+        'RMSE_std': cv_scores_rmse.std(),
+    }
+
+    # 2. Caricamento Modello Finale e inferenza su tutto il dataset
+    xgb_model = joblib.load("./data/xgb_model_final.pkl")
+    xgb_model.fit(X, y)
+    y_pred = xgb_model.predict(X)
+    
+    final_r2 = r2_score(y, y_pred)
+    final_rmse = np.sqrt(mean_squared_error(y, y_pred))
+
+    final_results = {
+        'R2': final_r2,
+        'RMSE': final_rmse
+    }
+
+    # 3. SHAP ANALYSIS
+    explainer = shap.TreeExplainer(xgb_model)
+    shap_values = explainer.shap_values(X)
+    
+    # Crea un DataFrame per i valori SHAP (usando df_clean per gli indici)
+    shap_df = pd.DataFrame(shap_values, columns=feature_cols)
+    shap_df.insert(0, 'name', df_clean['name'].values)
+    shap_df.insert(1, 'location', df_clean['location'].values)
+    shap_df.insert(2, 'ranking_score', df_clean['ranking_score'].values)
+    shap_df.insert(3, 'predicted_score', y_pred)
+    
+    # Dati necessari per i plot SHAP
+    X_with_ranking = np.column_stack([X, y])
+    shap_values_extended = np.column_stack([shap_values, np.zeros(len(y))])
+    
+    # Aggiorna session state con i risultati
+    st.session_state['shap_df'] = shap_df
+    st.session_state['df'] = df_clean # Aggiorna il DF in session_state con il DF pulito
+    st.session_state['model_results'] = {
+        'cv': cv_results,
+        'final': final_results,
+        'feature_cols': feature_cols
+    }
+    st.session_state['shap_data'] = {
+        'model': xgb_model, 
+        'explainer': explainer, 
+        'shap_values': shap_values, 
+        'X': X, 
+        'y': y, 
+        'X_with_ranking': X_with_ranking, 
+        'shap_values_extended': shap_values_extended
+    }
+    st.success("Modello XGBoost caricato e valori SHAP calcolati con successo!")
 
 
 # --- Funzioni di Plotting (Rimosse decorazioni e logica di caricamento) ---
@@ -521,16 +597,23 @@ with tab_esplorazione:
 # -----------------------------------------------------
 with tab_modello:
     
-    st.header("Addestramento del Modello e Calcolo SHAP")
+    st.header("Modello di Machine Learning e Calcolo SHAP")
     
     if st.session_state['df'] is None:
         st.warning("Per addestrare il modello, carica prima i dati nel Tab 'Caricamento & Esplorazione Dati'.")
     else:
         # Bottone per addestrare il modello
-        if st.button("🚀 Avvia Addestramento Modello & Analisi SHAP"):
-            with st.spinner("Addestramento in corso... (potrebbe richiedere qualche istante)"):
-                train_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
-            # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
+        col_bottone1, col_bottone2, col_empty = st.columns([1, 1, 4])
+        with col_bottone1:
+            if st.button("🚀 Avvia Addestramento del Modello da zero"):
+                with st.spinner("Addestramento in corso... (potrebbe richiedere qualche minuto)"):
+                    train_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
+                # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
+        with col_bottone2:
+            if st.button("♻️ Carica il modello pre-addestrato"):
+                with st.spinner("Caricamento del modello..."):
+                    pretrain_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
+                # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
 
         # Contenuto del Tab 2 (Mostrato solo se il modello è stato addestrato)
         if st.session_state['shap_df'] is not None:
