@@ -527,7 +527,7 @@ with tab_esplorazione:
                             st.session_state['shap_data'] = None
                             st.success("Dati caricati e pronti per l'analisi.")
                         else:
-                            st.error("Caricamento fallito. Controlla il formato del file.")1
+                            st.error("Caricamento fallito. Controlla il formato del file.")
                             st.session_state['df'] = None
                     
                     # Forzare un rerun per aggiornare la visualizzazione
