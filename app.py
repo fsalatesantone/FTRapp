@@ -646,15 +646,12 @@ with tab_modello:
                 excel_data = to_excel_download(df_input, df_importance, shap_df)
 
 
-                col1, col2 = st.columns([3, 2])
-                with col1:
-                    st.info("📊 Scarica il file Excel con i risultati 👉")
-                with col2:
-                    st.download_button(
-                        label="⬇️ Scarica file (.xlsx)",
-                        data=excel_data,
-                        file_name="analisi_ranking_ft.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                st.info("📊 Scarica il file Excel con i risultati 👇")
+                st.download_button(
+                    label="⬇️ Scarica file (.xlsx)",
+                    data=excel_data,
+                    file_name="analisi_ranking_ft.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 
         # Contenuto del Tab 2 (Mostrato solo se il modello è stato addestrato)
