@@ -231,7 +231,7 @@ def train_and_shap(df):
         'shap_values_extended': shap_values_extended
     }
     st.session_state['training_time'] = execution_time
-    st.success("Modello XGBoost addestrato con successo in **{training_time:.2f} secondi** ⏱️")
+    st.success(f"Modello XGBoost addestrato con successo in **{execution_time:.2f} secondi** ⏱️")
 
 
 def pretrain_and_shap(df):
@@ -311,7 +311,7 @@ def pretrain_and_shap(df):
         'shap_values_extended': shap_values_extended
     }
     st.session_state['training_time'] = execution_time
-    st.success("Modello XGBoost caricato con successo in **{training_time:.2f} secondi** ⏱️")
+    st.success(f"Modello XGBoost caricato con successo in **{execution_time:.2f} secondi** ⏱️")
 
 
 # --- Funzioni di Plotting (Rimosse decorazioni e logica di caricamento) ---
@@ -488,54 +488,68 @@ with tab_esplorazione:
     st.header("Caricamento Dati di Input")
     
     # File Uploader
-    col_uploader, col_empty_uploader = st.columns([2, 3])
+    col_uploader, col_system_data, col_empty_uploader = st.columns([1, 1, 4])
     with col_uploader:
         uploaded_file = st.file_uploader(
             "Carica il tuo file Excel (.xlsx) contenente i dati del ranking FT.", 
             type="xlsx"
         )
-
-    df = st.session_state['df']
-    sheet_name = None
-    
-    if uploaded_file is not None:
-        # Se un file è caricato, mostra il selettore di sheet
-        sheet_names = get_sheet_names(uploaded_file)
+        df = st.session_state['df']
+        sheet_name = None
         
-        if sheet_names:
-            col_sheet, col_empty = st.columns([1, 3])
-            with col_sheet:
-                # Trova il foglio che contiene '(R)' come default, se esiste
-                default_index = next((i for i, name in enumerate(sheet_names) if '(R)' in name), 0)
-                
-                sheet_name = st.selectbox(
-                    "Seleziona il foglio di lavoro da caricare:",
-                    sheet_names,
-                    index=default_index,
-                    key='sheet_select'
-                )
-                
-            # Bottone di caricamento
-            if st.button("Upload del file"):
-                # Carica i dati e salva il DF pulito in session_state['df']
-                with st.spinner(f"Caricamento dati dal foglio '{sheet_name}'..."):
-                    df_temp = load_data_from_upload(uploaded_file, sheet_name)
-                    if df_temp is not None:
-                        st.session_state['df'] = df_temp
-                        # Resetta i risultati del modello precedente
-                        st.session_state['shap_df'] = None
-                        st.session_state['model_results'] = None
-                        st.session_state['shap_data'] = None
-                        st.success("Dati caricati e pronti per l'analisi.")
-                    else:
-                        st.error("Caricamento fallito. Controlla il formato del file.")
-                        st.session_state['df'] = None
-                
-                # Forzare un rerun per aggiornare la visualizzazione
-                st.rerun()
+        if uploaded_file is not None:
+            # Se un file è caricato, mostra il selettore di sheet
+            sheet_names = get_sheet_names(uploaded_file)
             
-            st.markdown("---")
+            if sheet_names:
+                col_sheet, col_empty = st.columns([1, 3])
+                with col_sheet:
+                    # Trova il foglio che contiene '(R)' come default, se esiste
+                    default_index = next((i for i, name in enumerate(sheet_names) if '(R)' in name), 0)
+                    
+                    sheet_name = st.selectbox(
+                        "Seleziona il foglio di lavoro da caricare:",
+                        sheet_names,
+                        index=default_index,
+                        key='sheet_select'
+                    )
+                    
+                # Bottone di caricamento
+                if st.button("Upload del file"):
+                    # Carica i dati e salva il DF pulito in session_state['df']
+                    with st.spinner(f"Caricamento dati dal foglio '{sheet_name}'..."):
+                        df_temp = load_data_from_upload(uploaded_file, sheet_name)
+                        if df_temp is not None:
+                            st.session_state['df'] = df_temp
+                            # Resetta i risultati del modello precedente
+                            st.session_state['shap_df'] = None
+                            st.session_state['model_results'] = None
+                            st.session_state['shap_data'] = None
+                            st.success("Dati caricati e pronti per l'analisi.")
+                        else:
+                            st.error("Caricamento fallito. Controlla il formato del file.")
+                            st.session_state['df'] = None
+                    
+                    # Forzare un rerun per aggiornare la visualizzazione
+                    st.rerun()
+                
+                st.markdown("---")
 
+    with col_system_data:
+        st.markdown("**Tabella dati di sistema:**")
+        if st.button("Carica dati predefiniti"):
+            example_file_path = "./data/FT MIM 2025.xlsx"
+            with open(example_file_path, "rb") as f:
+                example_data = f.read()
+            st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "FT Rankings (R)")
+            # Resetta i risultati del modello precedente
+            st.session_state['shap_df'] = None
+            st.session_state['model_results'] = None
+            st.session_state['shap_data'] = None
+            st.success("Dati di esempio caricati con successo.")
+            # Forzare un rerun per aggiornare la visualizzazione
+            st.rerun()
+            st.markdown("---")
 
     # Contenuto Esplorazione (Mostrato solo se i dati sono stati caricati)
     if st.session_state['df'] is not None:
