@@ -643,11 +643,15 @@ with tab_modello:
                     'Feature': st.session_state['model_results']['feature_cols'],
                     'Importance': np.abs(st.session_state['shap_data']['shap_values']).mean(axis=0)
                 }).sort_values('Importance', ascending=False)
-                
                 excel_data = to_excel_download(df_input, df_importance, shap_df)
-                b64 = base64.b64encode(excel_data).decode()
-                href = f'<a href="data:application/octet-stream;base64,{b64}" download="FT_Ranking_SHAP_Analysis.xlsx">⬇️ Scarica i dati elaborati in Excel</a>'
-                st.markdown(href, unsafe_allow_html=True)
+
+                st.info("📊 Analisi completata! Scarica il file Excel con i risultati qui sotto 👇")
+                st.download_button(
+                    label="⬇️ Scarica file Excel (.xlsx)",
+                    data=excel_data,
+                    file_name="analisi_ranking_ft.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
 
         # Contenuto del Tab 2 (Mostrato solo se il modello è stato addestrato)
         if st.session_state['shap_df'] is not None:
@@ -735,25 +739,6 @@ with tab_modello:
                 with all_cols[i % n_cols]:
                     fig = plot_shap_dependence(feat_idx, shap_values_extended, X_with_ranking, feature_cols_with_ranking)
                     st.pyplot(fig, use_container_width=True)
-
-
-            # # --- Esportazione Dati ---
-            # st.markdown("---")
-            # st.subheader("Download dei Dati Elaborati")
-
-            # # Crea il df di importanza per l'export
-            # feature_importance_df = pd.DataFrame({'feature': feature_cols, 'importance': np.abs(shap_values).mean(axis=0)}).sort_values('importance', ascending=False)
-
-            # # Genera i dati binari
-            # excel_data = to_excel_download(df, feature_importance_df, shap_df) 
-
-            # # Utilizza st.download_button per un bottone più carino
-            # st.download_button(
-            #     label="⬇️ Scarica file Excel (.xlsx)",
-            #     data=excel_data,
-            #     file_name="analisi_ranking_ft_risultati.xlsx",
-            #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            # )
         else:
             st.info("Addestra il modello o caricane uno già stimato, e visualizza i risultati SHAP.")
 
