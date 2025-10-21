@@ -623,7 +623,7 @@ with tab_modello:
         st.warning("Per addestrare il modello, carica prima i dati nel Tab 'Caricamento & Esplorazione Dati'.")
     else:
         # Bottone per addestrare il modello
-        col_bottone1, col_bottone2, col_empty, col_download = st.columns([1, 1, 3, 1])
+        col_bottone1, col_bottone2, col_empty, col_download = st.columns([1, 1, 2, 2])
         with col_bottone1:
             if st.button("🚀 Avvia addestramento del modello"):
                 with st.spinner("Addestramento in corso... (potrebbe richiedere qualche minuto)"):
@@ -645,12 +645,16 @@ with tab_modello:
                 }).sort_values('Importance', ascending=False)
                 excel_data = to_excel_download(df_input, df_importance, shap_df)
 
-                st.info("📊 Analisi completata! Scarica il file Excel con i risultati qui sotto 👇")
-                st.download_button(
-                    label="⬇️ Scarica file Excel (.xlsx)",
-                    data=excel_data,
-                    file_name="analisi_ranking_ft.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+                col1, col2 = st.columns([3, 2])
+                with col1:
+                    st.info("📊 Scarica il file Excel con i risultati 👉")
+                with col2:
+                    st.download_button(
+                        label="⬇️ Scarica file (.xlsx)",
+                        data=excel_data,
+                        file_name="analisi_ranking_ft.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 
         # Contenuto del Tab 2 (Mostrato solo se il modello è stato addestrato)
