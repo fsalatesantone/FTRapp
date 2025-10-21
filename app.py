@@ -615,12 +615,12 @@ with tab_esplorazione:
             )
             st.plotly_chart(fig_var, use_container_width=True)
     
-    elif uploaded_file is None:
-        col_msg, col_msg_empty = st.columns([2, 2])
-        with col_msg:
-            st.info("Carica dei dati per iniziare.")
-    elif st.session_state['df'] is None and uploaded_file is not None and sheet_name is None:
-        st.info("Seleziona dati di input e premi 'Carica e Pre-processa Dati'.")
+    # elif uploaded_file is None:
+    #     col_msg, col_msg_empty = st.columns([2, 2])
+    #     with col_msg:
+    #         st.info("Carica dei dati per iniziare.")
+    # elif st.session_state['df'] is None and uploaded_file is not None and sheet_name is None:
+    #     st.info("Seleziona dati di input e premi 'Carica e Pre-processa Dati'.")
 
 
 # -----------------------------------------------------
