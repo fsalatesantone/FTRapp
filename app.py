@@ -491,7 +491,7 @@ with tab_esplorazione:
     col_uploader, col_system_data, col_empty_uploader = st.columns([1, 1, 4])
     with col_uploader:
         uploaded_file = st.file_uploader(
-            "Carica il tuo file Excel (.xlsx) contenente i dati del ranking FT.", 
+            "Carica il tuo file Excel (.xlsx)", 
             type="xlsx"
         )
         df = st.session_state['df']
@@ -536,7 +536,7 @@ with tab_esplorazione:
                 st.markdown("---")
 
     with col_system_data:
-        st.markdown("**Tabella dati di sistema:**")
+        st.markdown("Carica file excel già a sistema")
         if st.button("Carica dati predefiniti"):
             example_file_path = "./data/FT MIM 2025.xlsx"
             with open(example_file_path, "rb") as f:
@@ -613,11 +613,11 @@ with tab_esplorazione:
             st.plotly_chart(fig_var, use_container_width=True)
     
     elif uploaded_file is None:
-        col_msg, col_msg_empty = st.columns([2, 3])
+        col_msg, col_msg_empty = st.columns([2, 4])
         with col_msg:
-            st.info("Carica un file Excel per iniziare.")
+            st.info("Carica dei dati per iniziare.")
     elif st.session_state['df'] is None and uploaded_file is not None and sheet_name is None:
-        st.info("Seleziona un foglio di lavoro e premi 'Carica e Pre-processa Dati'.")
+        st.info("Seleziona dati di input e premi 'Carica e Pre-processa Dati'.")
 
 
 # -----------------------------------------------------
