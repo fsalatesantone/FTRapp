@@ -527,13 +527,13 @@ with tab_esplorazione:
                             st.session_state['shap_data'] = None
                             st.success("Dati caricati e pronti per l'analisi.")
                         else:
-                            st.error("Caricamento fallito. Controlla il formato del file.")
+                            st.error("Caricamento fallito. Controlla il formato del file.")1
                             st.session_state['df'] = None
                     
                     # Forzare un rerun per aggiornare la visualizzazione
                     st.rerun()
                 
-                st.markdown("---")
+                #st.markdown("---")
 
     with col_system_data:
         st.markdown("Carica file excel già a sistema")
@@ -549,15 +549,17 @@ with tab_esplorazione:
             st.success("Dati di esempio caricati con successo.")
             # Forzare un rerun per aggiornare la visualizzazione
             #st.rerun()
-            st.markdown("---")
+    
 
     # Contenuto Esplorazione (Mostrato solo se i dati sono stati caricati)
     if st.session_state['df'] is not None:
+        st.markdown("---")
         df = st.session_state['df']
         st.header("Tabella di Input")
         
         # Visualizzazione Tabella Completa
-        st.markdown(f"Dati caricati e pre-processati (Ranking Score: {df['ranking_score'].max():.0f} = Rank #1). `{len(df)}` Osservazioni.")
+        st.markdown(f"Dati caricati e pre-processati (Ranking Score: {df['ranking_score'].max():.0f} = Rank #1).")
+        st.markdown(f"**N. di osservazioni:** `{len(df)}` | **N. variabili:** `{len(df.columns)}`")
         st.dataframe(df, use_container_width=True, hide_index=True)
         st.markdown("---")
         
