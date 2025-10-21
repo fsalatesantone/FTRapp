@@ -502,7 +502,7 @@ with tab_esplorazione:
             sheet_names = get_sheet_names(uploaded_file)
             
             if sheet_names:
-                col_sheet, col_empty = st.columns([1, 3])
+                col_sheet, col_empty = st.columns([1, 0])
                 with col_sheet:
                     # Trova il foglio che contiene '(R)' come default, se esiste
                     default_index = next((i for i, name in enumerate(sheet_names) if '(R)' in name), 0)
@@ -616,7 +616,7 @@ with tab_esplorazione:
             st.plotly_chart(fig_var, use_container_width=True)
     
     elif uploaded_file is None:
-        col_msg, col_msg_empty = st.columns([2, 4])
+        col_msg, col_msg_empty = st.columns([2, 2])
         with col_msg:
             st.info("Carica dei dati per iniziare.")
     elif st.session_state['df'] is None and uploaded_file is not None and sheet_name is None:
