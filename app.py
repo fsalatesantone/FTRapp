@@ -541,14 +541,14 @@ with tab_esplorazione:
             example_file_path = "./data/FT MIM 2025.xlsx"
             with open(example_file_path, "rb") as f:
                 example_data = f.read()
-            st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "FT Rankings (R)")
+            st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "MIM 2025 (R)")
             # Resetta i risultati del modello precedente
             st.session_state['shap_df'] = None
             st.session_state['model_results'] = None
             st.session_state['shap_data'] = None
             st.success("Dati di esempio caricati con successo.")
             # Forzare un rerun per aggiornare la visualizzazione
-            st.rerun()
+            #st.rerun()
             st.markdown("---")
 
     # Contenuto Esplorazione (Mostrato solo se i dati sono stati caricati)
