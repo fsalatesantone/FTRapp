@@ -502,11 +502,7 @@ with tab_esplorazione:
             sheet_names = get_sheet_names(uploaded_file)
             
             if sheet_names:
-                # col_sheet = st.columns(1)
-                # with col_sheet:
-                # Trova il foglio che contiene '(R)' come default, se esiste
                 default_index = next((i for i, name in enumerate(sheet_names) if '(R)' in name), 0)
-                
                 sheet_name = st.selectbox(
                     "Seleziona il foglio di lavoro da caricare:",
                     sheet_names,
@@ -537,7 +533,7 @@ with tab_esplorazione:
 
     with col_system_data:
         st.markdown("Carica file excel già a sistema")
-        if st.button("Carica dati predefiniti"):
+        if st.button("🔄 Carica dati predefiniti"):
             example_file_path = "./data/FT MIM 2025.xlsx"
             with open(example_file_path, "rb") as f:
                 example_data = f.read()
@@ -614,13 +610,6 @@ with tab_esplorazione:
                 f"Classifica per: '{selected_variable}'"
             )
             st.plotly_chart(fig_var, use_container_width=True)
-    
-    # elif uploaded_file is None:
-    #     col_msg, col_msg_empty = st.columns([2, 2])
-    #     with col_msg:
-    #         st.info("Carica dei dati per iniziare.")
-    # elif st.session_state['df'] is None and uploaded_file is not None and sheet_name is None:
-    #     st.info("Seleziona dati di input e premi 'Carica e Pre-processa Dati'.")
 
 
 # -----------------------------------------------------
@@ -634,7 +623,7 @@ with tab_modello:
         st.warning("Per addestrare il modello, carica prima i dati nel Tab 'Caricamento & Esplorazione Dati'.")
     else:
         # Bottone per addestrare il modello
-        col_bottone1, col_bottone2, col_empty = st.columns([1, 1, 4])
+        col_bottone1, col_bottone2, col_empty, col_download = st.columns([1, 1, 3, 1])
         with col_bottone1:
             if st.button("🚀 Avvia addestramento del modello"):
                 with st.spinner("Addestramento in corso... (potrebbe richiedere qualche minuto)"):
@@ -645,6 +634,20 @@ with tab_modello:
                 with st.spinner("Caricamento del modello..."):
                     pretrain_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
                 # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
+
+        with col_download:
+            if st.session_state['shap_df'] is not None:
+                shap_df = st.session_state['shap_df']
+                df_input = st.session_state['df']
+                df_importance = pd.DataFrame({
+                    'Feature': st.session_state['model_results']['feature_cols'],
+                    'Importance': np.abs(st.session_state['shap_data']['shap_values']).mean(axis=0)
+                }).sort_values('Importance', ascending=False)
+                
+                excel_data = to_excel_download(df_input, df_importance, shap_df)
+                b64 = base64.b64encode(excel_data).decode()
+                href = f'<a href="data:application/octet-stream;base64,{b64}" download="FT_Ranking_SHAP_Analysis.xlsx">⬇️ Scarica i dati elaborati in Excel</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
         # Contenuto del Tab 2 (Mostrato solo se il modello è stato addestrato)
         if st.session_state['shap_df'] is not None:
@@ -734,23 +737,23 @@ with tab_modello:
                     st.pyplot(fig, use_container_width=True)
 
 
-            # --- Esportazione Dati ---
-            st.markdown("---")
-            st.subheader("Download dei Dati Elaborati")
+            # # --- Esportazione Dati ---
+            # st.markdown("---")
+            # st.subheader("Download dei Dati Elaborati")
 
-            # Crea il df di importanza per l'export
-            feature_importance_df = pd.DataFrame({'feature': feature_cols, 'importance': np.abs(shap_values).mean(axis=0)}).sort_values('importance', ascending=False)
+            # # Crea il df di importanza per l'export
+            # feature_importance_df = pd.DataFrame({'feature': feature_cols, 'importance': np.abs(shap_values).mean(axis=0)}).sort_values('importance', ascending=False)
 
-            # Genera i dati binari
-            excel_data = to_excel_download(df, feature_importance_df, shap_df) 
+            # # Genera i dati binari
+            # excel_data = to_excel_download(df, feature_importance_df, shap_df) 
 
-            # Utilizza st.download_button per un bottone più carino
-            st.download_button(
-                label="⬇️ Scarica file Excel (.xlsx)",
-                data=excel_data,
-                file_name="analisi_ranking_ft_risultati.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
+            # # Utilizza st.download_button per un bottone più carino
+            # st.download_button(
+            #     label="⬇️ Scarica file Excel (.xlsx)",
+            #     data=excel_data,
+            #     file_name="analisi_ranking_ft_risultati.xlsx",
+            #     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            # )
         else:
             st.info("Addestra il modello o caricane uno già stimato, e visualizza i risultati SHAP.")
 
