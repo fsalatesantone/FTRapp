@@ -764,7 +764,7 @@ with tab_drilldown:
         shap_values = shap_data['shap_values']
         X = shap_data['X']
         
-        col_select_uni, col_select_empty = st.columns([1, 5])
+        col_select_uni, col_select_empty = st.columns([2, 5])
 
         with col_select_uni:
             # Selezione dell'università tramite menu a tendina
@@ -774,7 +774,7 @@ with tab_drilldown:
             default_index = list(uni_names).index(luiss_name) if luiss_name in uni_names else 0
 
             selected_uni_name = st.selectbox(
-                "Cambia l'Università:",
+                "Seleziona Università:",
                 uni_names,
                 index=default_index,
                 key='uni_drilldown_select' # Aggiunto key per Streamlit
@@ -786,7 +786,7 @@ with tab_drilldown:
         uni_score = df_reset.iloc[uni_idx_in_X_shap]['ranking_score']
         ft_rank = int(df_reset['ranking_score'].max() - uni_score + 1)
 
-        st.header(f"Drill-Down per '*{selected_uni_name}*' - Rank #{ft_rank} (Score: {uni_score:.0f})")
+        st.header(f"**{selected_uni_name}** - Rank #{ft_rank} (Score: {uni_score:.0f})")
 
         # ... (Il resto del codice Force Plot e Waterfall Plot del Drill-Down iniziale rimane invariato) ...
         col_waterfall, col_force = st.columns([2, 4])
