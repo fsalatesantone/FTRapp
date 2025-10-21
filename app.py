@@ -987,7 +987,7 @@ with tab_relazioni:
         X = shap_data['X']
 
 
-        col_corr_controls, col_corr_graph, col_corr_top = st.columns([1, 3, 1])
+        col_corr_controls, col_corr_graph, col_corr_top = st.columns([1, 4, 2])
 
         with col_corr_controls:
             st.markdown("### ⚙️ Impostazioni")
@@ -1038,7 +1038,7 @@ with tab_relazioni:
         st.markdown("---")
         st.markdown("## 💡 Analisi delle Interazioni SHAP")
 
-        col_shap_controls, col_shap_plot, col_shap_top = st.columns([1, 3, 1])
+        col_shap_controls, col_shap_plot, col_shap_top = st.columns([1, 4, 2])
 
         with col_shap_controls:
             n_feature_show = st.slider("Numero di feature da mostrare:", 1, max_features, min(7, max_features), 1)
@@ -1076,7 +1076,7 @@ with tab_relazioni:
         st.markdown("---")
         st.markdown("## 🕸️ Grafo delle Relazioni")
 
-        col_grafo_controls, col_grafo_view, col_grafo_info = st.columns([1, 3, 1])
+        col_grafo_controls, col_grafo_view, col_grafo_info = st.columns([1, 4, 2])
 
         with col_grafo_controls:
             soglia_corr = st.slider("Soglia min. correlazione (|r|):", 0.0, 1.0, 0.5, 0.05)
