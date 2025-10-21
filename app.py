@@ -502,7 +502,7 @@ with tab_esplorazione:
             sheet_names = get_sheet_names(uploaded_file)
             
             if sheet_names:
-                col_sheet, col_empty = st.columns([1, 0])
+                col_sheet = st.columns([1])
                 with col_sheet:
                     # Trova il foglio che contiene '(R)' come default, se esiste
                     default_index = next((i for i, name in enumerate(sheet_names) if '(R)' in name), 0)
