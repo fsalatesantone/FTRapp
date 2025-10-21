@@ -231,7 +231,7 @@ def train_and_shap(df):
         'shap_values_extended': shap_values_extended
     }
     st.session_state['training_time'] = execution_time
-    st.success("Modello XGBoost addestrato con successo!")
+    st.success("Modello XGBoost addestrato con successo in **{training_time:.2f} secondi** ⏱️")
 
 
 def pretrain_and_shap(df):
@@ -311,7 +311,7 @@ def pretrain_and_shap(df):
         'shap_values_extended': shap_values_extended
     }
     st.session_state['training_time'] = execution_time
-    st.success("Modello XGBoost caricato con successo!")
+    st.success("Modello XGBoost caricato con successo in **{training_time:.2f} secondi** ⏱️")
 
 
 # --- Funzioni di Plotting (Rimosse decorazioni e logica di caricamento) ---
@@ -639,10 +639,6 @@ with tab_modello:
             final_results = st.session_state['model_results']['final']
             feature_cols = st.session_state['model_results']['feature_cols']
             shap_data = st.session_state['shap_data']
-
-            training_time = st.session_state['training_time'] # Estrai il tempo
-            if training_time is not None:
-                st.success(f"Tempo di esecuzione: **{training_time:.2f} secondi** ⏱️") # Stampa il tempo
             
             shap_values = shap_data['shap_values']
             X = shap_data['X']
@@ -659,7 +655,7 @@ with tab_modello:
             
             with col_data:
                 st.subheader("Riepilogo dati di input utilizzati")
-                st.markdown(f"* **Numero di Università (dopo pulizia NaN):** `{len(df)}`")
+                st.markdown(f"* **Numero di Università:** `{len(df)}`")
                 st.markdown(f"* **Numero di Feature:** `{len(feature_cols)}`")
                 st.dataframe(df[feature_cols].describe().T.style.format('{:.2f}'), use_container_width=True)
             
@@ -739,7 +735,7 @@ with tab_modello:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
         else:
-            st.info("Premi il bottone qui sopra per addestrare il modello e visualizzare i risultati SHAP.")
+            st.info("Addestra il modello o caricane uno già stimato, e visualizza i risultati SHAP.")
 
 
 # -----------------------------------------------------
