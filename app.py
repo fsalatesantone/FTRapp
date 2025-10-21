@@ -488,7 +488,7 @@ with tab_esplorazione:
     st.header("Caricamento Dati di Input")
     
     # File Uploader
-    col_uploader, col_system_data, col_empty_uploader = st.columns([1, 1, 4])
+    col_uploader, col_system_data, col_empty_uploader = st.columns([1, 1, 2])
     with col_uploader:
         uploaded_file = st.file_uploader(
             "Carica il tuo file Excel (.xlsx)", 
