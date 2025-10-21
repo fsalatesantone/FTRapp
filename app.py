@@ -13,6 +13,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 import plotly.express as px
 import plotly.graph_objects as go
 import joblib
+import time
 
 # --- Configurazione Iniziale di Streamlit ---
 st.set_page_config(layout="wide", page_title="Analisi Ranking FT (SHAP)")
@@ -27,6 +28,8 @@ if 'model_results' not in st.session_state:
     st.session_state['model_results'] = None
 if 'shap_data' not in st.session_state:
     st.session_state['shap_data'] = None
+if 'training_time' not in st.session_state:
+    st.session_state['training_time'] = None # Salva il tempo di esecuzione
 
 # CSS personalizzato per migliorare la visibilità dei tab
 st.markdown("""
@@ -60,8 +63,8 @@ st.markdown("""
             </style>
 """, unsafe_allow_html=True)
 
-st.title("Analisi e Interpretabilità del Ranking FT")
-st.markdown("*Applicazione Streamlit per l'analisi dei fattori che influenzano il ranking del Financial Times, utilizzando un modello XGBoost e l'interpretabilità SHAP.*")
+st.title("Analisi del Ranking FT")
+st.markdown("*Applicazione per l'analisi dei fattori che influenzano il ranking del Financial Times, utilizzando un modello XGBoost e l'interpretabilità SHAP.*")
 
 
 # --- Funzioni Utilità per Caricamento Dati ---
@@ -140,6 +143,7 @@ def load_data_from_upload(uploaded_file, sheet_name):
 # @st.cache_resource è rimosso per permettere il re-training
 def train_and_shap(df):
     """Addestra il modello XGBoost e calcola i valori SHAP. Salva in session_state."""
+    start_time = time.time()
     random_seed = 3
     
     # Prepara i dati
@@ -204,6 +208,10 @@ def train_and_shap(df):
     # Dati necessari per i plot SHAP
     X_with_ranking = np.column_stack([X, y])
     shap_values_extended = np.column_stack([shap_values, np.zeros(len(y))])
+
+    # Calcolo del tempo di esecuzione
+    end_time = time.time()
+    execution_time = end_time - start_time
     
     # Aggiorna session state con i risultati
     st.session_state['shap_df'] = shap_df
@@ -222,11 +230,13 @@ def train_and_shap(df):
         'X_with_ranking': X_with_ranking, 
         'shap_values_extended': shap_values_extended
     }
+    st.session_state['training_time'] = execution_time
     st.success("Modello XGBoost addestrato con successo!")
 
 
 def pretrain_and_shap(df):
     """Carica il modello pre-addestrato di XGBoost e calcola i valori SHAP. Salva in session_state."""
+    start_time = time.time()
     random_seed = 3
     
     # Prepara i dati
@@ -279,6 +289,9 @@ def pretrain_and_shap(df):
     # Dati necessari per i plot SHAP
     X_with_ranking = np.column_stack([X, y])
     shap_values_extended = np.column_stack([shap_values, np.zeros(len(y))])
+
+    end_time = time.time() # Registra il tempo finale
+    execution_time = end_time - start_time
     
     # Aggiorna session state con i risultati
     st.session_state['shap_df'] = shap_df
@@ -297,6 +310,7 @@ def pretrain_and_shap(df):
         'X_with_ranking': X_with_ranking, 
         'shap_values_extended': shap_values_extended
     }
+    st.session_state['training_time'] = execution_time
     st.success("Modello XGBoost caricato con successo!")
 
 
@@ -625,6 +639,10 @@ with tab_modello:
             final_results = st.session_state['model_results']['final']
             feature_cols = st.session_state['model_results']['feature_cols']
             shap_data = st.session_state['shap_data']
+
+            training_time = st.session_state['training_time'] # Estrai il tempo
+            if training_time is not None:
+                st.success(f"Tempo di esecuzione: **{training_time:.2f} secondi** ⏱️") # Stampa il tempo
             
             shap_values = shap_data['shap_values']
             X = shap_data['X']
