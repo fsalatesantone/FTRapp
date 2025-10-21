@@ -14,6 +14,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import joblib
 import time
+from pyvis.network import Network
+import streamlit.components.v1 as components
+import networkx as nx
 
 # --- Configurazione Iniziale di Streamlit ---
 st.set_page_config(layout="wide", page_title="Analisi Ranking FT (SHAP)")
@@ -478,7 +481,7 @@ def to_excel_download(df_input, df_importance, df_shap):
 
 
 # --- Struttura dell'App Streamlit (Tabs) ---
-tab_esplorazione, tab_modello, tab_drilldown = st.tabs(["Caricamento & Esplorazione Dati", "Analisi Globale Modello (SHAP)", "Drill-Down per Università"])
+tab_esplorazione, tab_modello, tab_drilldown, tab_relazioni = st.tabs(["Caricamento & Esplorazione Dati", "Analisi Globale Modello (SHAP)", "Drill-Down per Università", "Relazioni tra variabili"])
 
 
 # -----------------------------------------------------
@@ -688,8 +691,8 @@ with tab_modello:
                 st.subheader("Performance del Modello XGBoost")
                 st.markdown(f"""
                 Il modello è stato addestrato per prevedere il **Ranking Score** (dove {df['ranking_score'].max():.0f} è il rank #1).
-                * **R² su Training Set:** `{final_results['R2']:.4f}`
-                * **RMSE su Training Set:** `{final_results['RMSE']:.4f}`
+                * **R²:** `{final_results['R2']:.4f}`
+                * **RMSE:** `{final_results['RMSE']:.4f}`
                 * **R² medio (Cross-Validation):** `{cv_results['R2_mean']:.4f} (+/- {cv_results['R2_std']:.4f})`
                 * **RMSE medio (Cross-Validation):** `{cv_results['RMSE_mean']:.4f} (+/- {cv_results['RMSE_std']:.4f})`
                 """)
@@ -962,3 +965,130 @@ with tab_drilldown:
                     
         else:
             st.info("Seleziona almeno un'università competitor per avviare l'analisi di confronto.")
+
+
+with tab_relazioni:
+    if st.session_state['shap_df'] is None:
+        st.warning("Per l'analisi delle relazioni tra variabili in input, devi prima addestrare il modello nel Tab 'Analisi Globale Modello (SHAP)'.")
+    else:
+        # Estrai dati da session state
+        df = st.session_state['df']
+        # Usiamo una versione con indice resettato per allineare gli indici con X e shap_values
+        df_reset = df.reset_index(drop=True) 
+        
+        shap_df = st.session_state['shap_df']
+        feature_cols = st.session_state['model_results']['feature_cols']
+        shap_data = st.session_state['shap_data']
+        explainer = shap_data['explainer']
+        shap_values = shap_data['shap_values']
+        X = shap_data['X']
+
+        st.header("Relazioni tra Variabili di Input")
+
+        col_correlazione, col_dependence, col_grafo = st.columns(3)
+
+        with col_correlazione:
+            st.subheader("Matrice di Correlazione")
+            st.caption("Visualizza la matrice di correlazione tra le variabili numeriche di input.")
+            numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'ranking_score' and c != 'name']
+            radio_option = st.radio(
+                "Seleziona il metodo di correlazione:",
+                ('Pearson', 'Spearman'),
+                index=0,
+                horizontal=True,
+                key='rel_corr_method'
+            )
+            corr_matrix = df[numeric_cols].corr(method='spearman' if radio_option == 'Spearman' else 'pearson')   
+
+            fig_corr, ax_corr = plt.subplots(figsize=(10, 8))
+            sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax_corr)
+            plt.tight_layout()
+            st.pyplot(fig_corr, use_container_width=True)
+
+
+        with col_dependence:
+            st.subheader("SHAP Dependence Plot")
+            st.caption("Esplora l'effetto di una feature sul Ranking Score, colorando i punti in base ai valori di un'altra feature.")
+            n_feature_show = st.slider("Numero di feature da mostrare:", 1, max_features, min(7, max_features), step=1, key='mod_slider_features_show')
+            X_cols = pd.DataFrame(X, columns=feature_cols)
+            shap_interaction_values = explainer.shap_interaction_values(X_cols)
+
+            shap.summary_plot(
+                shap_interaction_values,
+                X_cols,
+                max_display=n_feature_show,
+                show=False
+            )
+
+            # Recupera la figura corrente (quella creata internamente da SHAP)
+            fig = plt.gcf()
+            st.pyplot(fig, use_container_width=True)
+
+            # Facoltativo: chiudi la figura per non sovrapporre nei run successivi
+            plt.clf()
+
+
+        with col_grafo:
+            st.subheader("Grafo delle Relazioni tra Variabili")
+            st.caption("Visualizza le connessioni tra variabili di input in base alla correlazione e/o alle interazioni SHAP.")
+
+            # Soglie regolabili
+            col_soglia1, col_soglia2 = st.columns(2)
+            with col_soglia1:
+                soglia_corr = st.slider("Soglia minima di correlazione (|r|):", 0.0, 1.0, 0.50, 0.05, key='soglia_corr')
+            with col_soglia2:
+                soglia_shap = st.slider("Soglia minima di interazione SHAP:", 0.0, 1.0, 0.35, 0.05, key='soglia_shap')
+
+            # Calcola matrice di correlazione e di interazione
+            corr = corr_matrix.copy()
+
+            # Se shap_interaction_values è un numpy array, convertilo in DataFrame
+            if isinstance(shap_interaction_values, np.ndarray):
+                shap_inter_df = pd.DataFrame(
+                    np.abs(np.mean(shap_interaction_values, axis=0)),
+                    index=feature_cols,
+                    columns=feature_cols
+                )
+            else:
+                shap_inter_df = shap_interaction_values
+
+            # Crea grafo
+            G = nx.Graph()
+
+            # Aggiungi nodi (una volta sola)
+            for feature in feature_cols:
+                G.add_node(feature)
+
+            # --- Relazioni da correlazione ---
+            for col1 in feature_cols:
+                for col2 in feature_cols:
+                    if col1 != col2 and abs(corr.loc[col1, col2]) >= soglia_corr:
+                        G.add_edge(col1, col2, weight=abs(corr.loc[col1, col2]), tipo='corr')
+
+            # --- Relazioni da SHAP interaction ---
+            for col1 in feature_cols:
+                for col2 in feature_cols:
+                    if col1 != col2 and shap_inter_df.loc[col1, col2] >= soglia_shap:
+                        # Se esiste già un edge (da correlazione), non duplicarlo
+                        if not G.has_edge(col1, col2):
+                            G.add_edge(col1, col2, weight=shap_inter_df.loc[col1, col2], tipo='shap')
+
+            # Crea rete PyVis
+            net = Network(height="700px", width="100%", bgcolor="#ffffff", font_color="black")
+
+            # Converte da NetworkX a PyVis
+            net.from_nx(G)
+
+            # Personalizzazione opzionale: colore per tipo di relazione
+            for edge in net.edges:
+                tipo = G[edge['from']][edge['to']].get('tipo', '')
+                if tipo == 'corr':
+                    edge['color'] = 'blue'
+                elif tipo == 'shap':
+                    edge['color'] = 'orange'
+
+            # Layout fisico
+            net.force_atlas_2based()
+
+            html_content = net.generate_html()  # <-- HTML come stringa, nessun file su disco
+            components.html(html_content, height=750, scrolling=True)
