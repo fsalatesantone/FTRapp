@@ -502,17 +502,17 @@ with tab_esplorazione:
             sheet_names = get_sheet_names(uploaded_file)
             
             if sheet_names:
-                col_sheet = st.columns(1)
-                with col_sheet:
-                    # Trova il foglio che contiene '(R)' come default, se esiste
-                    default_index = next((i for i, name in enumerate(sheet_names) if '(R)' in name), 0)
-                    
-                    sheet_name = st.selectbox(
-                        "Seleziona il foglio di lavoro da caricare:",
-                        sheet_names,
-                        index=default_index,
-                        key='sheet_select'
-                    )
+                # col_sheet = st.columns(1)
+                # with col_sheet:
+                # Trova il foglio che contiene '(R)' come default, se esiste
+                default_index = next((i for i, name in enumerate(sheet_names) if '(R)' in name), 0)
+                
+                sheet_name = st.selectbox(
+                    "Seleziona il foglio di lavoro da caricare:",
+                    sheet_names,
+                    index=default_index,
+                    key='sheet_select'
+                )
                     
                 # Bottone di caricamento
                 if st.button("Upload del file"):
