@@ -27,6 +27,8 @@ if 'df' not in st.session_state:
     st.session_state['df'] = None
 if 'shap_df' not in st.session_state:
     st.session_state['shap_df'] = None
+if 'perimeter' not in st.session_state:
+    st.session_state['perimeter'] = None
 if 'model_results' not in st.session_state:
     st.session_state['model_results'] = None
 if 'shap_data' not in st.session_state:
@@ -237,7 +239,7 @@ def train_and_shap(df):
     st.success(f"Modello XGBoost addestrato con successo in **{execution_time:.2f} secondi** ⏱️")
 
 
-def pretrain_and_shap(df):
+def pretrain_and_shap(df, perimeter):
     """Carica il modello pre-addestrato di XGBoost e calcola i valori SHAP. Salva in session_state."""
     start_time = time.time()
     random_seed = 3
@@ -253,10 +255,15 @@ def pretrain_and_shap(df):
     
     X = df_clean[feature_cols].values
     y = df_clean['ranking_score'].values
+
+    if perimeter == 'Master in Management':
+        lab = 'MIM'
+    elif perimeter == 'Master in Finance':
+        lab = 'MIF'
     
     # Carica i risultati della CV
-    cv_scores_r2 = np.load("./data/cv_scores_r2.npy")
-    cv_scores_rmse = np.load("./data/cv_scores_rmse.npy")
+    cv_scores_r2 = np.load(f"./data/{lab}_cv_scores_r2.npy")
+    cv_scores_rmse = np.load(f"./data/{lab}_cv_scores_rmse.npy")
 
     cv_results = {
         'R2_mean': cv_scores_r2.mean(),
@@ -266,7 +273,7 @@ def pretrain_and_shap(df):
     }
 
     # 2. Caricamento Modello Finale e inferenza su tutto il dataset
-    xgb_model = joblib.load("./data/xgb_model_final.pkl")
+    xgb_model = joblib.load(f"./data/{lab}_xgb_model_final.pkl")
     xgb_model.fit(X, y)
     y_pred = xgb_model.predict(X)
     
@@ -314,7 +321,7 @@ def pretrain_and_shap(df):
         'shap_values_extended': shap_values_extended
     }
     st.session_state['training_time'] = execution_time
-    st.success(f"Modello XGBoost caricato con successo in **{execution_time:.2f} secondi** ⏱️")
+    st.success(f"Modello XGBoost ({perimeter}) caricato con successo in **{execution_time:.2f} secondi** ⏱️")
 
 
 # --- Funzioni di Plotting (Rimosse decorazioni e logica di caricamento) ---
@@ -491,10 +498,13 @@ with tab_esplorazione:
     st.header("Caricamento Dati di Input")
     
     # File Uploader
-    col_uploader, col_system_data, col_empty_uploader = st.columns([1, 1, 2])
+    col_uploader, col_empty1, col_system_data, col_empty_uploader = st.columns([2, 1, 2, 4])
     with col_uploader:
+        st.subheader("⬆️Carica il tuo file") # Nuovo sottotitolo per chiarezza
+        st.markdown("Carica il tuo file Excel **(.xlsx)**")
+
         uploaded_file = st.file_uploader(
-            "Carica il tuo file Excel (.xlsx)", 
+            "", 
             type="xlsx"
         )
         df = st.session_state['df']
@@ -520,6 +530,7 @@ with tab_esplorazione:
                         df_temp = load_data_from_upload(uploaded_file, sheet_name)
                         if df_temp is not None:
                             st.session_state['df'] = df_temp
+                            st.session_state['perimeter'] = ''
                             # Resetta i risultati del modello precedente
                             st.session_state['shap_df'] = None
                             st.session_state['model_results'] = None
@@ -531,36 +542,75 @@ with tab_esplorazione:
                     
                     # Forzare un rerun per aggiornare la visualizzazione
                     st.rerun()
-                
-                #st.markdown("---")
 
     with col_system_data:
-        st.markdown("Carica file excel già a sistema")
-        if st.button("🔄 Carica dati predefiniti"):
-            example_file_path = "./data/FT MIM 2025.xlsx"
-            with open(example_file_path, "rb") as f:
-                example_data = f.read()
-            st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "MIM 2025 (R)")
-            # Resetta i risultati del modello precedente
-            st.session_state['shap_df'] = None
-            st.session_state['model_results'] = None
-            st.session_state['shap_data'] = None
-            
-            # Forzare un rerun per aggiornare la visualizzazione
-            #st.rerun()
-    
+        st.subheader("🔄 Carica dati predefiniti")
+        st.markdown("Seleziona un set di dati")
+        st.markdown("")
+        st.markdown("")
+
+        col_mim, col_mif = st.columns(2)
+        with col_mim:
+            if st.button("Dati predefiniti MIM 💼", use_container_width=True):
+                example_file_path = "./data/FT Master in Management 2025.xlsx"
+                with open(example_file_path, "rb") as f:
+                    example_data = f.read()
+                st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "MIM 2025 (R)")
+                st.session_state['perimeter'] = 'Master in Management'
+                # Resetta i risultati del modello precedente
+                st.session_state['shap_df'] = None
+                st.session_state['model_results'] = None
+                st.session_state['shap_data'] = None
+        with col_mif:
+            if st.button("Dati predefiniti MIF 💰", use_container_width=True):
+                example_file_path = "./data/FT Masters in Finance 2025.xlsx"
+                with open(example_file_path, "rb") as f:
+                    example_data = f.read()
+                st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "CF25 (R)")
+                st.session_state['perimeter'] = 'Master in Finance'
+                # Resetta i risultati del modello precedente
+                st.session_state['shap_df'] = None
+                st.session_state['model_results'] = None
+                st.session_state['shap_data'] = None
 
     # Contenuto Esplorazione (Mostrato solo se i dati sono stati caricati)
     if st.session_state['df'] is not None:
         st.success("Dati caricati con successo.")
         st.markdown("---")
         df = st.session_state['df']
-        st.header("Tabella di Input")
+        st.header(f"Tabella di input {st.session_state['perimeter']}")
         
         # Visualizzazione Tabella Completa
         st.markdown(f"Dati caricati e pre-processati (Ranking Score: {df['ranking_score'].max():.0f} = Rank #1).")
         st.markdown(f"*N. di osservazioni:* `{len(df)}` | *N. variabili:* `{len(df.columns)}`")
         st.dataframe(df, use_container_width=True, hide_index=True)
+        popover = st.popover("💡 Data dictionary")
+        with popover:
+            st.caption("Legenda:")
+            st.markdown("""
+            * **name**: Nome dell'università.
+            * **location**: Nazione.
+            * **ranking_score**: Posizione nel ranking del Financial Times (100 = rank #1).
+            * **weighted_salary_usd**: Salario medio ponderato in USD (tre anni dopo il completamento del Master) per i laureati. I salari sono convertiti in dollari USA usando il purchasing power parity (PPP) per tener conto delle differenze dei costi di vita tra paesi. Inoltre, vengono applicate ponderazioni per ridurre la distorsione di salari estremi (alto o basso).
+            * **salary_increase_pct**: Percentuale media di aumento salariale tra il salario iniziale (subito dopo il completamento del master) e il salario attuale (a tre anni). Spesso metà del peso è sull'aumento assoluto e metà sulla percentuale relativa.
+            * **value_for_money_rank**: Classifica (rank) che misura il "rapporto qualità/prezzo" del programma, tenendo in considerazione il salario atteso, la durata del corso, le tasse e i costi opportunità (es. reddito perso durante il corso).
+            * **career_progress_rank**: Classifica basata sul progresso di carriera degli alumni: cambi di seniority, dimensione dell'organizzazione in cui lavorano ora rispetto a prima del master, aumento di responsabilità, e mobilità nei ruoli.
+            * **aims_achieved_pct**: Percentuale di alumni che riportano di aver raggiunto gli obiettivi professionali / personali dichiarati all'inizio del master (ovvero quanto il corso ha soddisfatto le aspettative).
+            * **careers_service_rank**: Classifica del servizio carriera della business school (ufficio placement, supporto, network, opportunità offerte) così come percepito dagli alumni / dati forniti.
+            * **alumni_network_rank**: Classifica della forza / efficacia della rete alumni (networking, collegamenti, supporto, opportunità grazie agli alumni).
+            * **employed_3m_pct**: Percentuale di alumni impiegati (in un lavoro rilevante) entro 3 mesi dal completamento del master.
+            * **female_faculty_pct**: Percentuale di docenti (facoltà) di genere femminile nella scuola / nel programma.
+            * **female_students_pct**: Percentuale di studenti di genere femminile nel programma del master.
+            * **women_on_board_pct**: Percentuale di membri femminili nel consiglio di amministrazione (board) della business school.
+            * **international_faculty_pct**: Percentuale di docenti con cittadinanza non locale / internazionale (cioè provenienti da paesi diversi).
+            * **international_students_pct**: Percentuale di studenti con cittadinanza internazionale (non del paese sede) nel programma.
+            * **international_board_pct**: Percentuale di membri del board della scuola con cittadinanza internazionale (non del paese sede).
+            * **intl_work_mobility_rank**: Classifica della mobilità internazionale del lavoro: misura quanti alumni si spostano in un paese diverso da quello d'origine per lavoro dopo il master (cambi di paese di impiego).
+            * **intl_course_experience_rank**: Classifica dell'esperienza internazionale del corso: quanto la componente internazionale è presente nei contenuti, esperienze, scambi, mobilità nel corso, progetti internazionali.
+            * **faculty_doctorates_pct**: Percentuale di docenti che possiedono un dottorato (PhD) o titolo equivalente.
+            * **esg_netzero_rank**: Classifica legata alla sostenibilità ed ESG (Environmental, Social, Governance), specialmente per l'impegno della scuola verso obiettivi "net zero" o di neutralità carbonica / pratiche green integrate.
+            * **carbon_footprint_rank**: Classifica basata sull'impronta di carbonio della scuola (emissioni dirette e indirette). Misura quanto la scuola è "virtuosa" dal punto di vista ambientale.
+            """)
         st.markdown("---")
         
         # Controlli per l'evidenziazione
@@ -635,7 +685,7 @@ with tab_modello:
         with col_bottone2:
             if st.button("♻️ Carica il modello pre-addestrato"):
                 with st.spinner("Caricamento del modello..."):
-                    pretrain_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
+                    pretrain_and_shap(st.session_state['df'].copy(), st.session_state['perimeter']) # Passa una copia per evitare side effects
                 # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
 
         with col_download:
@@ -696,7 +746,7 @@ with tab_modello:
                 * **R² medio (Cross-Validation):** `{cv_results['R2_mean']:.4f} (+/- {cv_results['R2_std']:.4f})`
                 * **RMSE medio (Cross-Validation):** `{cv_results['RMSE_mean']:.4f} (+/- {cv_results['RMSE_std']:.4f})`
                 """)
-                st.info("Nota: L'alto R² sul training set (non CV) suggerisce un buon *fit* per l'analisi SHAP interpretativa.")
+                st.info("Nota: L'alto R² suggerisce un ottimo *fit* per l'analisi SHAP interpretativa.")
 
             # --- Contenitore 2: Grafici di Importanza e Distribuzione SHAP ---
             st.markdown("---")
@@ -870,7 +920,7 @@ with tab_drilldown:
         # Opzione 1: Filtro per Area Geografica
         locations = ['Tutte le aree geografiche'] + list(sorted(df['location'].unique()))
         with col_filter_loc:
-            selected_location = st.selectbox("Filtra l'elenco università per Area Geografica:", locations, key='comp_location_filter')
+            selected_location = st.selectbox("Filtra per Area Geografica:", locations, key='comp_location_filter')
             
         # Applica il filtro geografico prima della multiselezione
         df_filtered = df[df['location'] == selected_location] if selected_location != 'Tutte le aree geografiche' else df
@@ -1157,206 +1207,3 @@ with tab_relazioni:
             - **Arancione** → interazioni SHAP  
             - Le connessioni appaiono solo se superano le soglie definite a sinistra.
             """)
-
-# with tab_relazioni:
-#     if st.session_state['shap_df'] is None:
-#         st.warning("Per l'analisi delle relazioni tra variabili in input, devi prima addestrare il modello nel Tab 'Analisi Globale Modello (SHAP)'.")
-#     else:
-#         # Estrai dati da session state
-#         df = st.session_state['df']
-#         # Usiamo una versione con indice resettato per allineare gli indici con X e shap_values
-#         df_reset = df.reset_index(drop=True) 
-        
-#         shap_df = st.session_state['shap_df']
-#         feature_cols = st.session_state['model_results']['feature_cols']
-#         shap_data = st.session_state['shap_data']
-#         explainer = shap_data['explainer']
-#         shap_values = shap_data['shap_values']
-#         X = shap_data['X']
-
-#         st.header("Relazioni tra Variabili di Input")
-
-#         col_correlazione, col_dependence, col_grafo = st.columns(3)
-
-#         with col_correlazione:
-#             st.subheader("Matrice di Correlazione")
-#             st.caption("Visualizza la matrice di correlazione tra le variabili numeriche di input.")
-#             numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'ranking_score' and c != 'name']
-#             radio_option = st.radio(
-#                 "Seleziona il metodo di correlazione:",
-#                 ('Pearson', 'Spearman'),
-#                 index=0,
-#                 horizontal=True,
-#                 key='rel_corr_method'
-#             )
-#             corr_matrix = df[numeric_cols].corr(method='spearman' if radio_option == 'Spearman' else 'pearson')   
-
-#             fig_corr, ax_corr = plt.subplots(figsize=(10, 8))
-#             sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax_corr)
-#             plt.tight_layout()
-#             st.pyplot(fig_corr, use_container_width=True)
-
-#             # --- Calcolo Top 10 correlazioni assolute ---
-#             corr_pairs = (
-#                 corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))  # parte triangolare sup.
-#                 .stack()
-#                 .reset_index()
-#                 .rename(columns={'level_0': 'Feature 1', 'level_1': 'Feature 2', 0: 'Correlation'})
-#             )
-
-#             # Ordina per valore assoluto decrescente
-#             corr_pairs['AbsCorr'] = corr_pairs['Correlation'].abs()
-#             corr_top = corr_pairs.sort_values('AbsCorr', ascending=False).head(10)
-
-#             st.markdown("### 🔝 Top 10 relazioni per correlazione assoluta")
-
-#             for _, row in corr_top.iterrows():
-#                 color = "#d4f8d4" if row['Correlation'] > 0 else "#ffe6e6"  # verde o rosso chiaro
-#                 border = "#8cd98c" if row['Correlation'] > 0 else "#ff9999"
-
-#                 st.markdown(
-#                     f"""
-#                     <div style="
-#                         background-color:{color};
-#                         padding:8px;
-#                         border-radius:5px;
-#                         margin-bottom:5px;
-#                         border:1px solid {border};
-#                     ">
-#                         <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: 
-#                         {row['Correlation']:+.2f}
-#                     </div>
-#                     """,
-#                     unsafe_allow_html=True
-#                 )
-
-
-#         with col_dependence:
-#             st.subheader("SHAP Dependence Plot")
-#             st.caption("Esplora l'effetto di una feature sul Ranking Score, colorando i punti in base ai valori di un'altra feature.")
-#             n_feature_show = st.slider("Numero di feature da mostrare:", 1, max_features, min(7, max_features), step=1, key='mod_slider_features_show')
-#             X_cols = pd.DataFrame(X, columns=feature_cols)
-#             shap_interaction_values = explainer.shap_interaction_values(X_cols)
-
-#             shap.summary_plot(
-#                 shap_interaction_values,
-#                 X_cols,
-#                 max_display=n_feature_show,
-#                 show=False
-#             )
-
-#             # Recupera la figura corrente (quella creata internamente da SHAP)
-#             fig = plt.gcf()
-#             st.pyplot(fig, use_container_width=True)
-
-#             # Facoltativo: chiudi la figura per non sovrapporre nei run successivi
-#             plt.clf()
-
-
-#             # --- Calcolo media assoluta delle interazioni SHAP ---
-#             if isinstance(shap_interaction_values, np.ndarray):
-#                 shap_inter_df = pd.DataFrame(
-#                     np.mean(np.abs(shap_interaction_values), axis=0),
-#                     index=feature_cols,
-#                     columns=feature_cols
-#                 )
-#             else:
-#                 shap_inter_df = shap_interaction_values
-
-#             # Estrarre coppie e ordinare
-#             shap_pairs = (
-#                 shap_inter_df.where(np.triu(np.ones(shap_inter_df.shape), k=1).astype(bool))
-#                 .stack()
-#                 .reset_index()
-#                 .rename(columns={'level_0': 'Feature 1', 'level_1': 'Feature 2', 0: 'Interaction'})
-#             )
-
-#             shap_top = shap_pairs.sort_values('Interaction', ascending=False).head(10)
-
-#             st.markdown("### 💡 Top 10 relazioni più forti (SHAP Interactions)")
-
-#             for _, row in shap_top.iterrows():
-#                 color = "#d4f8d4" if row['Interaction'] > 0 else "#ffe6e6"  # verde o rosso chiaro
-#                 border = "#8cd98c" if row['Interaction'] > 0 else "#ff9999"
-
-#                 st.markdown(
-#                     f"""
-#                     <div style="
-#                         background-color:{color};
-#                         padding:8px;
-#                         border-radius:5px;
-#                         margin-bottom:5px;
-#                         border:1px solid {border};
-#                     ">
-#                         <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: 
-#                         {row['Interaction']:+.2f}
-#                     </div>
-#                     """,
-#                     unsafe_allow_html=True
-#                 )
-
-
-#         with col_grafo:
-#             st.subheader("Grafo delle Relazioni tra Variabili")
-#             st.caption("Visualizza le connessioni tra variabili di input in base alla correlazione e/o alle interazioni SHAP.")
-
-#             # Soglie regolabili
-#             col_soglia1, col_soglia2 = st.columns(2)
-#             with col_soglia1:
-#                 soglia_corr = st.slider("Soglia minima di correlazione (|r|):", 0.0, 1.0, 0.50, 0.05, key='soglia_corr')
-#             with col_soglia2:
-#                 soglia_shap = st.slider("Soglia minima di interazione SHAP:", 0.0, 1.0, 0.35, 0.05, key='soglia_shap')
-
-#             # Calcola matrice di correlazione e di interazione
-#             corr = corr_matrix.copy()
-
-#             # Se shap_interaction_values è un numpy array, convertilo in DataFrame
-#             if isinstance(shap_interaction_values, np.ndarray):
-#                 shap_inter_df = pd.DataFrame(
-#                     np.abs(np.mean(shap_interaction_values, axis=0)),
-#                     index=feature_cols,
-#                     columns=feature_cols
-#                 )
-#             else:
-#                 shap_inter_df = shap_interaction_values
-
-#             # Crea grafo
-#             G = nx.Graph()
-
-#             # Aggiungi nodi (una volta sola)
-#             for feature in feature_cols:
-#                 G.add_node(feature)
-
-#             # --- Relazioni da correlazione ---
-#             for col1 in feature_cols:
-#                 for col2 in feature_cols:
-#                     if col1 != col2 and abs(corr.loc[col1, col2]) >= soglia_corr:
-#                         G.add_edge(col1, col2, weight=abs(corr.loc[col1, col2]), tipo='corr')
-
-#             # --- Relazioni da SHAP interaction ---
-#             for col1 in feature_cols:
-#                 for col2 in feature_cols:
-#                     if col1 != col2 and shap_inter_df.loc[col1, col2] >= soglia_shap:
-#                         # Se esiste già un edge (da correlazione), non duplicarlo
-#                         if not G.has_edge(col1, col2):
-#                             G.add_edge(col1, col2, weight=shap_inter_df.loc[col1, col2], tipo='shap')
-
-#             # Crea rete PyVis
-#             net = Network(height="700px", width="100%", bgcolor="#ffffff", font_color="black")
-
-#             # Converte da NetworkX a PyVis
-#             net.from_nx(G)
-
-#             # Personalizzazione opzionale: colore per tipo di relazione
-#             for edge in net.edges:
-#                 tipo = G[edge['from']][edge['to']].get('tipo', '')
-#                 if tipo == 'corr':
-#                     edge['color'] = 'blue'
-#                 elif tipo == 'shap':
-#                     edge['color'] = 'orange'
-
-#             # Layout fisico
-#             net.force_atlas_2based()
-
-#             html_content = net.generate_html()  # <-- HTML come stringa, nessun file su disco
-#             components.html(html_content, height=750, scrolling=True)
