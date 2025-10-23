@@ -18,7 +18,6 @@ from pyvis.network import Network
 import streamlit.components.v1 as components
 import networkx as nx
 from sklearn.feature_selection import mutual_info_regression
-import itertools
 
 # --- Configurazione Iniziale di Streamlit ---
 st.set_page_config(layout="wide", page_title="Analisi Ranking FT (SHAP)")
@@ -500,7 +499,7 @@ with tab_esplorazione:
     st.header("Caricamento Dati di Input")
     
     # File Uploader
-    col_uploader, col_empty1, col_system_data, col_empty_uploader = st.columns([2, 1, 3, 3])
+    col_uploader, col_empty1, col_system_data, col_empty_uploader = st.columns([2, 1, 2, 4])
     with col_uploader:
         st.subheader("⬆️Carica il tuo file") # Nuovo sottotitolo per chiarezza
         st.markdown("Carica il tuo file Excel **(.xlsx)**")
@@ -550,7 +549,7 @@ with tab_esplorazione:
         st.markdown("Seleziona un set di dati")
         st.markdown("")
         st.markdown("")
-        
+
         col_mim, col_mif = st.columns(2)
         with col_mim:
             if st.button("Dati predefiniti MIM 💼", use_container_width=True):
@@ -635,7 +634,6 @@ with tab_esplorazione:
         with col_rank_chart:
             # Grafico di Classifica Generale (Ranking Score)
             st.subheader("Classifica Generale")
-            st.markdown("")
             
             fig_rank = plot_ranked_variable(
                 df,
@@ -679,19 +677,17 @@ with tab_modello:
         st.warning("Per addestrare il modello, carica prima i dati nel Tab 'Caricamento & Esplorazione Dati'.")
     else:
         # Bottone per addestrare il modello
-        col_bottone1, col_empty, col_download = st.columns([1, 2, 1])
+        col_bottone1, col_bottone2, col_empty, col_download = st.columns([1, 1, 2, 2])
         with col_bottone1:
-            if uploaded_file is not None:
-                if st.button("🚀 Avvia addestramento del modello"):
-                    with st.spinner("Addestramento in corso... (potrebbe richiedere qualche minuto)"):
-                        train_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
-                    # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
-            # Se non è stato caricato il file manualemente, mostra il bottone di training
-            elif uploaded_file is None:
-                if st.button("♻️ Carica il modello pre-addestrato"):
-                    with st.spinner("Caricamento del modello..."):
-                        pretrain_and_shap(st.session_state['df'].copy(), st.session_state['perimeter']) # Passa una copia per evitare side effects
-                    # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
+            if st.button("🚀 Avvia addestramento del modello"):
+                with st.spinner("Addestramento in corso... (potrebbe richiedere qualche minuto)"):
+                    train_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
+                # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
+        with col_bottone2:
+            if st.button("♻️ Carica il modello pre-addestrato"):
+                with st.spinner("Caricamento del modello..."):
+                    pretrain_and_shap(st.session_state['df'].copy(), st.session_state['perimeter']) # Passa una copia per evitare side effects
+                # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
 
         with col_download:
             if st.session_state['shap_df'] is not None:
@@ -799,10 +795,7 @@ with tab_modello:
                     fig = plot_shap_dependence(feat_idx, shap_values_extended, X_with_ranking, feature_cols_with_ranking)
                     st.pyplot(fig, use_container_width=True)
         else:
-            if uploaded_file is None:
-                st.info("Clicca sul bottone per caricare il modello pre-addestrato e calcolare i valori SHAP.")
-            else:
-                st.info("Clicca sul bottone per addestrare il modello e calcolare i valori SHAP.")
+            st.info("Addestra il modello o caricane uno già stimato, e visualizza i risultati SHAP.")
 
 
 # -----------------------------------------------------
@@ -1031,6 +1024,7 @@ with tab_relazioni:
     if st.session_state['shap_df'] is None:
         st.warning("Per l'analisi Drill-Down, devi prima addestrare il modello nel Tab 'Analisi Globale Modello (SHAP)'.")
     else:
+
         # Estrai dati da session state
         df = st.session_state['df']
         # Usiamo una versione con indice resettato per allineare gli indici con X e shap_values
@@ -1042,36 +1036,22 @@ with tab_relazioni:
         explainer = shap_data['explainer']
         shap_values = shap_data['shap_values']
         X = shap_data['X']
-        numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c not in ['ranking_score', 'name']]
 
-        col_scelta_corr, col_popover_corr, col_empty = st.columns([2, 2, 6])
-        with col_scelta_corr:
+
+        col_corr_controls, col_corr_graph, col_corr_top = st.columns([1, 4, 2])
+
+        with col_corr_controls:
+            st.markdown("### ⚙️ Impostazioni")
+            numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c not in ['ranking_score', 'name']]
             radio_option = st.radio(
                 "Metodo di correlazione:",
                 ('Pearson', 'Spearman'),
                 index=0,
-                horizontal=True,
+                horizontal=False,
                 key='rel_corr_method'
             )
-        with col_popover_corr:
-            popover_corr = st.popover("ℹ️ Info sui metodi di correlazione")
-            with popover_corr:
-                st.caption("📘 Tipi di correlazione: Pearson e Spearman")
-                st.markdown("""
-                - **Correlazione di Pearson**: Misura la relazione lineare tra due variabili continue. 
-                  Assume che i dati siano normalmente distribuiti e sensibili ai valori anomali. 
-                  È adatta quando la relazione tra le variabili è lineare.
 
-                - **Correlazione di Spearman**: Misura la relazione monotona tra due variabili, 
-                  basandosi sui ranghi anziché sui valori effettivi. 
-                  Non richiede l'assunzione di normalità ed è meno sensibile ai valori anomali. 
-                  È ideale per relazioni non lineari ma monotone.
-                """)
-
-        col_corr_matrice, col_empty1, col_corr_top, col_empty2, col_corr_grafo = st.columns([4, 0.25, 2, 0.25, 3])            
-
-        with col_corr_matrice:
-            st.markdown("### 🔗 Matrice delle correlazioni")
+        with col_corr_graph:
             method = 'spearman' if radio_option == 'Spearman' else 'pearson'
             corr_matrix = df[numeric_cols].corr(method=method)
 
@@ -1082,8 +1062,6 @@ with tab_relazioni:
             st.pyplot(fig_corr, use_container_width=True)
 
         with col_corr_top:
-            st.markdown("### 🔝 Top 10 correlazioni")
-            st.markdown("")
             corr_pairs = (
                 corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
                 .stack()
@@ -1093,121 +1071,68 @@ with tab_relazioni:
             corr_pairs['AbsCorr'] = corr_pairs['Correlation'].abs()
             corr_top = corr_pairs.sort_values('AbsCorr', ascending=False).head(10)
 
+            st.markdown("### 🔝 Top 10 correlazioni")
             for _, row in corr_top.iterrows():
-                # Colori dinamici in base al segno della correlazione
-                if row['Correlation'] > 0:
-                    color_bg = "#d4f8d4"   # verde chiaro
-                    border_color = "#8cd98c"  # verde medio
-                    value_bg = "#2E7D32"   # verde scuro per contrasto
-                else:
-                    color_bg = "#ffe6e6"   # rosso chiaro
-                    border_color = "#ff9999"  # rosso medio
-                    value_bg = "#B71C1C"   # rosso scuro per contrasto
-
+                color = "#d4f8d4" if row['Correlation'] > 0 else "#ffe6e6"
+                border = "#8cd98c" if row['Correlation'] > 0 else "#ff9999"
                 st.markdown(
                     f"""
-                    <div style="display:flex; align-items:center; justify-content:space-between; 
-                                margin-bottom:5px;">
-                        <div style="flex:1; background-color:{color_bg}; padding:6px 2px; border-radius:6px;
-                                    border:1px solid {border_color}; color:#1a1a1a;">
-                            {row['Feature 1']} ↔ {row['Feature 2']}
-                        </div>
-                        <div style="width:2px;"></div>
-                        <div style="width:70px; text-align:center; 
-                                    background-color:{value_bg}; color:white;
-                                    padding:6px 0; border-radius:6px;
-                                    font-family:monospace;">
-                            {row['Correlation']:+.2f}
-                        </div>
+                    <div style="background-color:{color};padding:8px;border-radius:5px;
+                                margin-bottom:5px;border:1px solid {border};">
+                        <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: {row['Correlation']:+.2f}
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
 
-            # for _, row in corr_top.iterrows():
-            #     color = "#d4f8d4" if row['Correlation'] > 0 else "#ffe6e6"
-            #     border = "#8cd98c" if row['Correlation'] > 0 else "#ff9999"
-            #     st.markdown(
-            #         f"""
-            #         <div style="background-color:{color};padding:5px;border-radius:5px;
-            #                     margin-bottom:3px;border:1px solid {border};">
-            #             <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: {row['Correlation']:+.2f}
-            #         </div>
-            #         """,
-            #         unsafe_allow_html=True
-            #     )
-        with col_corr_grafo:
-            st.markdown("### 🕸️ Grafo delle correlazioni")
 
-            col_corr_slider, col_empty, col_corr_stat = st.columns([2, 1, 1])
-            with col_corr_slider:
-                soglia_corr = st.slider("Soglia min. correlazione (|r|):", 0.0, 1.0, 0.5, 0.05, key='rel_corr_grafo_slider')
+        # st.markdown("---")
+        # st.markdown("## 💡 Analisi delle Interazioni SHAP")
 
-                # Crea grafo
-                G_corr = nx.Graph()
+        # col_shap_controls, col_shap_plot, col_shap_top = st.columns([1, 4, 2])
 
-                # Aggiungi nodi (una volta sola)
-                for feature in numeric_cols:
-                    G_corr.add_node(feature)
+        # with col_shap_controls:
+        #     n_feature_show = st.slider("Numero di feature da mostrare:", 1, max_features, min(7, max_features), 1)
+        #     st.caption("Il grafico mostra l’effetto medio delle interazioni tra le feature sul punteggio predetto.")
 
-                # Aggiungi archi basati sulla soglia di correlazione
-                corr_edges = 0
-                for col1, col2 in itertools.combinations(feature_cols, 2):  # tutte le coppie uniche
-                    if abs(corr_matrix.loc[col1, col2]) >= soglia_corr:
-                        G_corr.add_edge(col1, col2, weight=abs(corr_matrix.loc[col1, col2]), tipo='corr')
-                        corr_edges += 1
+        # with col_shap_plot:
+        #     X_cols = pd.DataFrame(X, columns=feature_cols)
+        #     shap_interaction_values = explainer.shap_interaction_values(X_cols)
+        #     shap.summary_plot(shap_interaction_values, X_cols, max_display=n_feature_show, show=False)
+        #     st.pyplot(plt.gcf(), use_container_width=True)
+        #     plt.clf()
 
-                # --- Crea rete PyVis ---
-                net_corr = Network(
-                    height="75vh",
-                    width="100%",
-                    bgcolor="#ffffff",
-                    font_color="black",
-                    directed=False
-                )
-
-                # Aggiungi i nodi dal grafo NetworkX
-                for node in G_corr.nodes:
-                    net_corr.add_node(node, label=node, title=f"{node}", color="#41a4ff")
-
-                # Aggiungi archi con tooltip che mostra il peso
-                for u, v, data in G_corr.edges(data=True):
-                    weight = data.get("weight", 0)
-                    #tipo = data.get("tipo", "")
-                    color = "#BDC8D9" #if tipo == "corr" else "gray"
-
-                    net_corr.add_edge(u, v, value=weight, title=f"Correlazione: {weight:.3f}", color=color)
-
-            with col_corr_stat:
-                st.caption(f"N. di archi: {corr_edges}")
-
-
-            net_corr.force_atlas_2based()
-            html_content = net_corr.generate_html()
-            # (inietta JavaScript per centrare e zoomare automaticamente)
-            html_content = html_content.replace(
-                "</body>",
-                """
-                <script type="text/javascript">
-                    // Attende che la rete sia pronta, poi centra la vista
-                    window.addEventListener('load', () => {
-                        if (typeof network !== 'undefined') {
-                            network.fit();
-                        }
-                    });
-                </script>
-                </body>
-                """
-            )
-            components.html(html_content, height=750, scrolling=True)
-
+        # with col_shap_top:
+        #     shap_inter_df = pd.DataFrame(np.mean(np.abs(shap_interaction_values), axis=0),
+        #                                 index=feature_cols, columns=feature_cols)
+        #     shap_pairs = (
+        #         shap_inter_df.where(np.triu(np.ones(shap_inter_df.shape), k=1).astype(bool))
+        #         .stack()
+        #         .reset_index()
+        #         .rename(columns={'level_0': 'Feature 1', 'level_1': 'Feature 2', 0: 'Interaction'})
+        #     )
+        #     shap_top = shap_pairs.sort_values('Interaction', ascending=False).head(10)
+        #     st.markdown("### 🔝 Top 10 interazioni SHAP")
+        #     for _, row in shap_top.iterrows():
+        #         st.markdown(
+        #             f"""
+        #             <div style="background-color:#e6f7ff;padding:8px;border-radius:5px;
+        #                         margin-bottom:5px;border:1px solid #99ddff;">
+        #                 <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: {row['Interaction']:.3f}
+        #             </div>
+        #             """,
+        #             unsafe_allow_html=True
+        #         )
 
         st.markdown("---")
-        st.markdown("## 💡 Analisi delle Relazioni tramite Mutual Information")
+        st.markdown("## 💡 Analisi delle Relazioni tra Feature tramite Mutual Information")
 
-        popover_mi = st.popover("ℹ️ Info sulla Mutual Information")
-        with popover_mi:
-            st.caption("📘 Cos'è la Mutual Information (MI)")
+        # --- Layout a 3 colonne ---
+        col_mi_info, col_mi_plot, col_mi_top = st.columns([1.2, 4, 2])
+
+        # --- 1️⃣ Colonna sinistra: spiegazione teorica ---
+        with col_mi_info:
+            st.markdown("### 📘 Cos'è la Mutual Information (MI)")
             st.markdown("""
             La **Mutual Information (MI)** misura la **dipendenza statistica** tra due variabili, 
             valutando quanta **informazione condividono**.  
@@ -1217,16 +1142,13 @@ with tab_relazioni:
             **Vantaggi principali:**
             - Rileva dipendenze anche non lineari 📈  
             - È simmetrica: MI(A, B) = MI(B, A) 🔁  
-            - Non richiede assunzioni di distribuzione ⚙️
-                        
-            Il **grafico** mostra la quantità media di informazione condivisa tra le feature del dataset.
-                        """)
+            - Non richiede assunzioni di distribuzione ⚙️  
+            """)
 
-        col_mi_matrice, col_empty1, col_mi_top, col_empty2, col_mi_grafo = st.columns([4, 0.25, 2, 0.25, 3]) 
+            st.caption("Il grafico mostra la quantità media di informazione condivisa tra le feature del dataset.")
 
-        with col_mi_matrice:
-            st.markdown("### 🔗 Mutual Information tra Variabili Indipendenti")
-            
+
+        with col_mi_plot:
             X_cols = pd.DataFrame(X, columns=feature_cols)
 
             # Inizializza la matrice quadrata dei risultati MI
@@ -1262,13 +1184,13 @@ with tab_relazioni:
                 annot_kws={"size": 8},
                 cbar_kws={'label': 'Mutual Information Score'}
             )
+            plt.title('Mutual Information tra Variabili Indipendenti')
             st.pyplot(plt.gcf(), use_container_width=True)
             plt.clf()
 
-
         with col_mi_top:
-            st.markdown("### 🔝 Top 10 relazioni")
-            st.markdown("")
+            st.markdown("### 🔝 Top 10 Relazioni per Mutual Information")
+
             mi_pairs = (
                 mi_matrix.where(np.triu(np.ones(mi_matrix.shape), k=1).astype(bool))
                 .stack()
@@ -1278,97 +1200,100 @@ with tab_relazioni:
 
             mi_top = mi_pairs.sort_values('MI Score', ascending=False).head(10)
 
-            # for _, row in mi_top.iterrows():
-            #     st.markdown(
-            #         f"""
-            #         <div style="background-color:#f2f9f2;padding:5px;border-radius:5px;
-            #                     margin-bottom:3px;border:1px solid #a3d9a5;">
-            #             <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: {row['MI Score']:.2f}
-            #         </div>
-            #         """,
-            #         unsafe_allow_html=True
-            #     )
             for _, row in mi_top.iterrows():
                 st.markdown(
                     f"""
-                    <div style="display:flex; align-items:center; justify-content:space-between; 
-                                margin-bottom:5px;">
-                        <div style="flex:1; background-color:#edf3f9; padding:6px 2px; border-radius:6px;
-                                    border:1px solid ##41a4ff; color:#1a1a1a;">
-                            {row['Feature 1']} ↔ {row['Feature 2']}
-                        </div>
-                        <div style="width:2px;"></div>
-                        <div style="width:70px; text-align:center; 
-                                    background-color:#41a4ff; color:white;
-                                    padding:6px 0; border-radius:6px;
-                                    font-family:monospace;">
-                            {row['MI Score']:.2f}
-                        </div>
+                    <div style="background-color:#f2f9f2;padding:8px;border-radius:5px;
+                                margin-bottom:5px;border:1px solid #a3d9a5;">
+                        <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: {row['MI Score']:.2f}
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
 
-        with col_mi_grafo:
-            st.markdown("### 🕸️ Grafo delle relazioni")
 
-            col_mi_slider, col_empty, col_mi_stat = st.columns([2, 1, 1])
-            with col_mi_slider:
-                soglia_mi = st.slider("Soglia min. Mutual Information:", 0.0, 1.0, 0.3, 0.05, key='rel_mi_grafo_slider')
+        st.markdown("---")
+        st.markdown("## 🕸️ Grafo delle Relazioni")
 
-            # Crea grafo
-            G_mi = nx.Graph()
+        col_grafo_controls, col_grafo_view, col_grafo_info = st.columns([1, 4, 2])
 
-            # Aggiungi nodi (una volta sola)
-            for feature in numeric_cols:
-                G_mi.add_node(feature)
+        with col_grafo_controls:
+            soglia_corr = st.slider("Soglia min. correlazione (|r|):", 0.0, 1.0, 0.5, 0.05)
+            soglia_shap = st.slider("Soglia min. interazione SHAP:", 0.0, 1.0, 0.35, 0.05)
 
-            # Aggiungi archi basati sulla soglia
-            mi_edges = 0
-            for col1, col2 in itertools.combinations(feature_cols, 2):  # tutte le coppie uniche
-                if abs(mi_matrix.loc[col1, col2]) >= soglia_mi:
-                    G_mi.add_edge(col1, col2, weight=abs(mi_matrix.loc[col1, col2]), tipo='corr')
-                    mi_edges += 1
+        with col_grafo_view:
+            # Calcola matrice di correlazione e di interazione
+            corr = corr_matrix.copy()
 
-            # --- Crea rete PyVis ---
-            net_mi = Network(
-                height="75vh",
-                width="100%",
-                bgcolor="#ffffff",
-                font_color="black",
-                directed=False
-            )
+            # Se shap_interaction_values è un numpy array, convertilo in DataFrame
+            if isinstance(shap_interaction_values, np.ndarray):
+                shap_inter_df = pd.DataFrame(
+                    np.abs(np.mean(shap_interaction_values, axis=0)),
+                    index=feature_cols,
+                    columns=feature_cols
+                )
+            else:
+                shap_inter_df = shap_interaction_values
 
-            # Aggiungi i nodi dal grafo NetworkX
-            for node in G_mi.nodes:
-                net_mi.add_node(node, label=node, title=f"{node}", color="#41a4ff")
+        #     # Crea grafo
+        #     G = nx.Graph()
 
-            # Aggiungi archi con tooltip che mostra il peso
-            for u, v, data in G_mi.edges(data=True):
-                weight = data.get("weight", 0)
-                #tipo = data.get("tipo", "")
-                color = "#BDC8D9" #if tipo == "corr" else "gray"
+        #     # Aggiungi nodi (una volta sola)
+        #     for feature in feature_cols:
+        #         G.add_node(feature)
 
-                net_mi.add_edge(u, v, value=weight, title=f"Mutual Information: {weight:.3f}", color=color)
+        #     # --- Relazioni da correlazione ---
+        #     corr_edges = 0
+        #     for i, col1 in enumerate(feature_cols):
+        #         for j in range(i + 1, len(feature_cols)):  # parte sopra la diagonale
+        #             col2 = feature_cols[j]
+        #             if abs(corr.loc[col1, col2]) >= soglia_corr:
+        #                 G.add_edge(col1, col2, weight=abs(corr.loc[col1, col2]), tipo='corr')
+        #                 corr_edges += 1
 
-            with col_mi_stat:
-                st.caption(f"N. di archi: {mi_edges}")
+        #     # --- Riallina shap_inter_df e pulisci NaN ---
+        #     shap_inter_df = shap_inter_df.reindex(index=feature_cols, columns=feature_cols).fillna(0)
 
-            net_mi.force_atlas_2based()
-            html_content_mi = net_mi.generate_html()
-            # (inietta JavaScript per centrare e zoomare automaticamente)
-            html_content_mi = html_content_mi.replace(
-                "</body>",
-                """
-                <script type="text/javascript">
-                    // Attende che la rete sia pronta, poi centra la vista
-                    window.addEventListener('load', () => {
-                        if (typeof network !== 'undefined') {
-                            network.fit();
-                        }
-                    });
-                </script>
-                </body>
-                """
-            )
-            components.html(html_content_mi, height=750, scrolling=True)
+        #     # --- Relazioni da SHAP interaction ---
+        #     shap_edges = 0
+        #     # Filtra solo le coppie con interazione >= soglia
+        #     shap_pairs_filtered = shap_pairs[shap_pairs['Interaction'] >= soglia_shap]
+        #     for _, row in shap_pairs_filtered.iterrows():
+        #         col1 = row['Feature 1']
+        #         col2 = row['Feature 2']
+        #         val = row['Interaction']
+
+        #         # Se non esiste già un arco da correlazione, aggiungilo
+        #         if not G.has_edge(col1, col2):
+        #             G.add_edge(col1, col2, weight=val, tipo='shap')
+        #             shap_edges += 1
+
+        #     # --- Messaggio diagnostico per debug ---
+        #     st.caption(f"🔵 {corr_edges} connessioni da correlazione | 🟠 {shap_edges} connessioni da SHAP (soglie: corr={soglia_corr}, shap={soglia_shap})")
+
+        #     # --- Crea rete PyVis ---
+        #     net = Network(height="700px", width="100%", bgcolor="#ffffff", font_color="black")
+        #     net.from_nx(G)
+
+        #     # Colori per tipo di relazione
+        #     for edge in net.edges:
+        #         tipo = G[edge['from']][edge['to']].get('tipo', '')
+        #         if tipo == 'corr':
+        #             edge['color'] = 'blue'
+        #         elif tipo == 'shap':
+        #             edge['color'] = 'orange'
+
+        #     net.force_atlas_2based()
+
+        #     # Visualizza HTML interattivo
+        #     html_content = net.generate_html()
+        #     components.html(html_content, height=750, scrolling=True)
+
+
+        # with col_grafo_info:
+        #     st.markdown("### 📘 Info grafo")
+        #     st.write("""
+        #     - **Blu** → correlazioni forti  
+        #     - **Arancione** → interazioni SHAP  
+        #     - Le connessioni appaiono solo se superano le soglie definite a sinistra.
+        #     """)
