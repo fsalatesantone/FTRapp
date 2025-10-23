@@ -1068,7 +1068,7 @@ with tab_relazioni:
                   È ideale per relazioni non lineari ma monotone.
                 """)
 
-        col_corr_matrice, col_empty1, col_corr_top, col_empty2, col_corr_grafo = st.columns([4, 0.25, 2, 0.25, 3])            
+        col_corr_matrice, col_empty1, col_corr_grafo = st.columns([4, 1, 4])            
 
         with col_corr_matrice:
             st.markdown("### 🔗 Matrice delle correlazioni")
@@ -1081,48 +1081,46 @@ with tab_relazioni:
             sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax_corr)
             st.pyplot(fig_corr, use_container_width=True)
 
-        with col_corr_top:
-            st.markdown("### 🔝 Top 10 correlazioni")
-            st.markdown("")
-            corr_pairs = (
-                corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
-                .stack()
-                .reset_index()
-                .rename(columns={'level_0': 'Feature 1', 'level_1': 'Feature 2', 0: 'Correlation'})
-            )
-            corr_pairs['AbsCorr'] = corr_pairs['Correlation'].abs()
-            corr_top = corr_pairs.sort_values('AbsCorr', ascending=False).head(10)
-
-            for _, row in corr_top.iterrows():
-                # Colori dinamici in base al segno della correlazione
-                if row['Correlation'] > 0:
-                    color_bg = "#d4f8d4"   # verde chiaro
-                    border_color = "#8cd98c"  # verde medio
-                    value_bg = "#2E7D32"   # verde scuro per contrasto
-                else:
-                    color_bg = "#ffe6e6"   # rosso chiaro
-                    border_color = "#ff9999"  # rosso medio
-                    value_bg = "#B71C1C"   # rosso scuro per contrasto
-
-                st.markdown(
-                    f"""
-                    <div style="display:flex; align-items:center; justify-content:space-between; 
-                                margin-bottom:5px;">
-                        <div style="flex:1; background-color:{color_bg}; padding:6px 2px; border-radius:6px;
-                                    border:1px solid {border_color}; color:#1a1a1a;">
-                            {row['Feature 1']} ↔ {row['Feature 2']}
-                        </div>
-                        <div style="width:2px;"></div>
-                        <div style="width:70px; text-align:center; 
-                                    background-color:{value_bg}; color:white;
-                                    padding:6px 0; border-radius:6px;
-                                    font-family:monospace;">
-                            {row['Correlation']:+.2f}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+            with st.expander("🔝 Top 10 correlazioni", expanded=False):
+                corr_pairs = (
+                    corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+                    .stack()
+                    .reset_index()
+                    .rename(columns={'level_0': 'Feature 1', 'level_1': 'Feature 2', 0: 'Correlation'})
                 )
+                corr_pairs['AbsCorr'] = corr_pairs['Correlation'].abs()
+                corr_top = corr_pairs.sort_values('AbsCorr', ascending=False).head(10)
+
+                for _, row in corr_top.iterrows():
+                    # Colori dinamici in base al segno della correlazione
+                    if row['Correlation'] > 0:
+                        color_bg = "#d4f8d4"   # verde chiaro
+                        border_color = "#8cd98c"  # verde medio
+                        value_bg = "#2E7D32"   # verde scuro per contrasto
+                    else:
+                        color_bg = "#ffe6e6"   # rosso chiaro
+                        border_color = "#ff9999"  # rosso medio
+                        value_bg = "#B71C1C"   # rosso scuro per contrasto
+
+                    st.markdown(
+                        f"""
+                        <div style="display:flex; align-items:center; justify-content:space-between; 
+                                    margin-bottom:5px;">
+                            <div style="flex:1; background-color:{color_bg}; padding:6px 2px; border-radius:6px;
+                                        border:1px solid {border_color}; color:#1a1a1a;">
+                                {row['Feature 1']} ↔ {row['Feature 2']}
+                            </div>
+                            <div style="width:2px;"></div>
+                            <div style="width:70px; text-align:center; 
+                                        background-color:{value_bg}; color:white;
+                                        padding:6px 0; border-radius:6px;
+                                        font-family:monospace;">
+                                {row['Correlation']:+.2f}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
             # for _, row in corr_top.iterrows():
             #     color = "#d4f8d4" if row['Correlation'] > 0 else "#ffe6e6"
@@ -1159,7 +1157,7 @@ with tab_relazioni:
 
                 # --- Crea rete PyVis ---
                 net_corr = Network(
-                    height="75vh",
+                    height="85vh",
                     width="100%",
                     bgcolor="#ffffff",
                     font_color="black",
@@ -1222,7 +1220,7 @@ with tab_relazioni:
             Il **grafico** mostra la quantità media di informazione condivisa tra le feature del dataset.
                         """)
 
-        col_mi_matrice, col_empty1, col_mi_top, col_empty2, col_mi_grafo = st.columns([4, 0.25, 2, 0.25, 3]) 
+        col_mi_matrice, col_empty1, col_mi_grafo = st.columns([4, 1, 4]) 
 
         with col_mi_matrice:
             st.markdown("### 🔗 Mutual Information tra Variabili Indipendenti")
@@ -1266,48 +1264,36 @@ with tab_relazioni:
             plt.clf()
 
 
-        with col_mi_top:
-            st.markdown("### 🔝 Top 10 relazioni")
-            st.markdown("")
-            mi_pairs = (
-                mi_matrix.where(np.triu(np.ones(mi_matrix.shape), k=1).astype(bool))
-                .stack()
-                .reset_index()
-                .rename(columns={'level_0': 'Feature 1', 'level_1': 'Feature 2', 0: 'MI Score'})
-            )
-
-            mi_top = mi_pairs.sort_values('MI Score', ascending=False).head(10)
-
-            # for _, row in mi_top.iterrows():
-            #     st.markdown(
-            #         f"""
-            #         <div style="background-color:#f2f9f2;padding:5px;border-radius:5px;
-            #                     margin-bottom:3px;border:1px solid #a3d9a5;">
-            #             <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: {row['MI Score']:.2f}
-            #         </div>
-            #         """,
-            #         unsafe_allow_html=True
-            #     )
-            for _, row in mi_top.iterrows():
-                st.markdown(
-                    f"""
-                    <div style="display:flex; align-items:center; justify-content:space-between; 
-                                margin-bottom:5px;">
-                        <div style="flex:1; background-color:#edf3f9; padding:6px 2px; border-radius:6px;
-                                    border:1px solid ##41a4ff; color:#1a1a1a;">
-                            {row['Feature 1']} ↔ {row['Feature 2']}
-                        </div>
-                        <div style="width:2px;"></div>
-                        <div style="width:70px; text-align:center; 
-                                    background-color:#41a4ff; color:white;
-                                    padding:6px 0; border-radius:6px;
-                                    font-family:monospace;">
-                            {row['MI Score']:.2f}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
+            with st.expander("🔝 Top 10 relazioni", expanded=False):
+                mi_pairs = (
+                    mi_matrix.where(np.triu(np.ones(mi_matrix.shape), k=1).astype(bool))
+                    .stack()
+                    .reset_index()
+                    .rename(columns={'level_0': 'Feature 1', 'level_1': 'Feature 2', 0: 'MI Score'})
                 )
+
+                mi_top = mi_pairs.sort_values('MI Score', ascending=False).head(10)
+
+                for _, row in mi_top.iterrows():
+                    st.markdown(
+                        f"""
+                        <div style="display:flex; align-items:center; justify-content:space-between; 
+                                    margin-bottom:5px;">
+                            <div style="flex:1; background-color:#edf3f9; padding:6px 2px; border-radius:6px;
+                                        border:1px solid ##41a4ff; color:#1a1a1a;">
+                                {row['Feature 1']} ↔ {row['Feature 2']}
+                            </div>
+                            <div style="width:2px;"></div>
+                            <div style="width:70px; text-align:center; 
+                                        background-color:#41a4ff; color:white;
+                                        padding:6px 0; border-radius:6px;
+                                        font-family:monospace;">
+                                {row['MI Score']:.2f}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
         with col_mi_grafo:
             st.markdown("### 🕸️ Grafo delle relazioni")
@@ -1332,7 +1318,7 @@ with tab_relazioni:
 
             # --- Crea rete PyVis ---
             net_mi = Network(
-                height="75vh",
+                height="85vh",
                 width="100%",
                 bgcolor="#ffffff",
                 font_color="black",
