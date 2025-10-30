@@ -1152,7 +1152,7 @@ with tab_relazioni:
                 corr_edges = 0
                 for col1, col2 in itertools.combinations(feature_cols, 2):  # tutte le coppie uniche
                     if abs(corr_matrix.loc[col1, col2]) >= soglia_corr:
-                        G_corr.add_edge(col1, col2, weight=abs(corr_matrix.loc[col1, col2]), tipo='corr')
+                        G_corr.add_edge(col1, col2, weight=corr_matrix.loc[col1, col2], tipo='corr')
                         corr_edges += 1
 
                 # --- Crea rete PyVis ---
@@ -1171,10 +1171,26 @@ with tab_relazioni:
                 # Aggiungi archi con tooltip che mostra il peso
                 for u, v, data in G_corr.edges(data=True):
                     weight = data.get("weight", 0)
-                    #tipo = data.get("tipo", "")
-                    color = "#BDC8D9" #if tipo == "corr" else "gray"
+                    abs_weight = abs(weight)
+                    min_width = 1
+                    
+                    # Calcola lo spessore basato sulla soglia e sull'intensità
+                    if abs_weight >= soglia_corr:
+                        # Se soglia_corr è 1.0, questo calcolo fallisce (divisione per zero).
+                        if 1.0 - soglia_corr > 0.01: 
+                            # Normalizzazione e scalatura da min_width a max_width (es. 10)
+                            scaled_width = (abs_weight - soglia_corr) / (1.0 - soglia_corr)
+                            edge_width = (scaled_width * 9) + min_width
+                        else:
+                            # Caso in cui soglia è vicina a 1.0, usiamo uno spessore massimo fisso
+                            edge_width = 10 
+                    else:
+                        # Questo caso è teoricamente impossibile se la logica di NetworkX è corretta
+                        edge_width = min_width
 
-                    net_corr.add_edge(u, v, value=weight, title=f"Correlazione: {weight:.3f}", color=color)
+                    color = "#BDC8D9" if weight >= 0 else "#ef8585"
+
+                    net_corr.add_edge(u, v, value=abs_weight, title=f"Correlazione: {weight:.3f}", color=color, width=edge_width)
 
             with col_corr_stat:
                 st.caption(f"N. di archi: {corr_edges}")
