@@ -1363,91 +1363,82 @@ with tab_scenario:
     st.markdown("---")
     st.markdown("## 🧮 Scenario Analysis")
     st.caption("Modifica i valori delle feature per simulare scenari alternativi e vedere l'impatto sul Ranking Score previsto.")
-
     if st.session_state.get('shap_df') is None:
         st.warning("Per l'analisi di Scenario, devi prima addestrare il modello nel Tab 'Analisi Globale Modello (SHAP)'.")
     else:
+        # Si assume che le librerie necessarie (come pandas, numpy) siano già importate altrove.
+        import numpy as np # Necessario per np.array
+        import pandas as pd # Aggiunto per sicurezza se non globale
+        
         # --- Estrai dati ---
         df = st.session_state['df']
         df_reset = df.reset_index(drop=True)
-        # shap_df = st.session_state['shap_df'] # Non usato in questo blocco
         feature_cols = st.session_state['model_results']['feature_cols']
         shap_data = st.session_state['shap_data']
         model = shap_data['model']
         X = shap_data['X']
 
-        if 'scenario_values' not in st.session_state:
-            st.session_state['scenario_values'] = {}
-        
         # --- Selezione università ---
-        col_select_uni_scenario, col_empty, col_reset,  = st.columns([2, 3, 1])
+        col_select_uni_scenario, col_empty, col_reset = st.columns([2, 3, 1])
         with col_select_uni_scenario:
             uni_names = sorted(df['name'].unique())
             luiss_name = "Luiss University/Luiss Business School"
             default_index = list(uni_names).index(luiss_name) if luiss_name in uni_names else 0
             selected_uni_name = st.selectbox("Seleziona Università:", uni_names, index=default_index, key='uni_scenario_select')
-
-        # più robusto di query con stringhe
         uni_idx = df_reset.index[df_reset['name'] == selected_uni_name][0]
         uni_score_original = float(df_reset.iloc[uni_idx]['ranking_score'])
         ft_rank_original = int(df_reset['ranking_score'].max() - uni_score_original + 1)
-
         # valori originali feature
         df_features = pd.DataFrame(X, columns=feature_cols)
-        original_values = {col: float(df_features.iloc[uni_idx][col]) for col in feature_cols} # Usa il DataFrame per estrarre
-
+        original_values = {col: float(df_features.iloc[uni_idx][col]) for col in feature_cols}
+        
+        # Inizializza o resetta scenario_values quando cambia università
+        if 'last_selected_uni' not in st.session_state or selected_uni_name != st.session_state['last_selected_uni']:
+            st.session_state['scenario_values'] = original_values.copy()
+            st.session_state['last_selected_uni'] = selected_uni_name
+            st.session_state['scenario_result'] = None
+            # IMPORTANTE: Resetta anche le chiavi degli slider per la nuova università
+            for feature in feature_cols:
+                if f"slider_{feature}" in st.session_state:
+                    del st.session_state[f"slider_{feature}"]
+            
         def reset_scenario():
             """Funzione di callback per resettare i valori di scenario e il risultato."""
             st.session_state['scenario_values'] = original_values.copy()
-            st.session_state['scenario_result'] = None # Resetta anche il risultato
-            # Non è necessario resettare i singoli slider se si usa il valore di sessione come default
-            
+            st.session_state['scenario_result'] = None
+            # # IMPORTANTE: Resetta anche le chiavi degli slider al valore originale
+            # for feature in feature_cols:
+            #     st.session_state[f"slider_{feature}"] = original_values[feature]
+
         with col_reset:
             st.markdown(""); st.markdown("")
             if st.button("🔄 Reset ai valori originali", use_container_width=True, on_click=reset_scenario):
-                # La funzione on_click gestisce il reset e il rerun implicito (se non si aggiorna subito il risultato)
-                pass 
-                
-        # init valori scenario per nuova università
-        if not st.session_state['scenario_values'] or selected_uni_name != st.session_state.get('last_selected_uni'):
-            st.session_state['scenario_values'] = original_values.copy()
-            st.session_state['last_selected_uni'] = selected_uni_name
-            # Quando si cambia università, resetta anche il risultato per coerenza
-            st.session_state['scenario_result'] = None
-
-
+                # Se il reset è chiamato (callback), lo stato è già aggiornato.
+                # Qui non facciamo nulla.
+                pass
         st.markdown("---")
-
+        
         # --- Layout colonne ---
         col_scores, col_features = st.columns([1, 4])
-
+        
         with col_features:
             st.subheader("⚙️ Modifica Feature")
             st.caption("Imposta i valori e premi 'Calcola scenario' per aggiornare il punteggio.")
-            
-            # # Intestazione della tabella features
-            # col_label_head, col_slider_head, col_original_head = st.columns([1, 3, 1])
-            # with col_original_head:
-            #     st.markdown(f"<div style='padding-top:4px;'><strong>Valore Originale</strong></div>", unsafe_allow_html=True)
-            
-            # Inizializza contenitore risultato
+
             if 'scenario_result' not in st.session_state:
                 st.session_state['scenario_result'] = None
-
+                
             with st.form("scenario_form", clear_on_submit=False):
-
-                col_empty_form, col_submit = st.columns([1,4])
+                col_empty_form, col_submit = st.columns([1, 4])
                 with col_submit:
                     submitted = st.form_submit_button("🚀 Calcola scenario",
                                                        use_container_width=True,
-                                                       type='primary'
-                                                       )
-
+                                                       type='primary')
+                
                 # LOOP SLIDER dentro la form
-                updated_scenario_values = {}
                 for feature in feature_cols:
                     col_label, col_slider = st.columns([1, 4])
-
+                    
                     # Calcolo min/max/step
                     if feature == 'weighted_salary_usd':
                         min_val = float(round(float(df_features[feature].min()*0.8) / 100) * 100)
@@ -1455,50 +1446,52 @@ with tab_scenario:
                         step = 100.0
                     else:
                         min_val, max_val, step = 0.0, 100.0, 1.0
-
+                        
                     original_val = float(original_values[feature])
-                    current_val = float(st.session_state['scenario_values'].get(feature, original_val))
+                    
+                    # Il valore iniziale DEVE essere preso dalla chiave del widget
+                    # se è già in sessione, altrimenti da scenario_values
+                    if f"slider_{feature}" in st.session_state and selected_uni_name == st.session_state['last_selected_uni']:
+                        # Uso il valore memorizzato nella chiave del widget se esiste
+                        current_val = st.session_state[f"slider_{feature}"]
+                    else:
+                        # Altrimenti, usa il valore di scenario (che è l'originale al primo load/cambio università)
+                        current_val = float(st.session_state['scenario_values'].get(feature, original_val))
 
-
+                    
                     with col_label:
                         st.markdown(f"<div style='padding-top:4px;'><strong>{feature}</strong></div>", unsafe_allow_html=True)
-
+                        
                     with col_slider:
-                        new_val = st.slider(
+                        st.slider(
                             label="",
                             min_value=float(min_val),
                             max_value=float(max_val),
-                            value=current_val, # Importante usare current_val (da scenario_values)
+                            value=current_val, # Usa il valore correttamente inizializzato
                             step=float(step),
-                            key=f"slider_{feature}", # La chiave è necessaria per la form
+                            key=f"slider_{feature}",
                             help=f"Valore originale: {original_val}",
                             label_visibility="visible"
                         )
                     
-                    # Salvo il valore aggiornato dello slider temporaneamente per l'elaborazione al submit
-                    updated_scenario_values[feature] = new_val
-
-                
-
             # Gestione submit (fuori dal with st.form)
             if submitted:
-                # Sincronizza scenario_values con i valori aggiornati degli slider
-                st.session_state['scenario_values'] = updated_scenario_values
-
-                # calcola la previsione SOLO su submit
+                # 1. Aggiorna lo stato dei valori di scenario con i valori finali del form
+                for feature in feature_cols:
+                    # I valori sono già nelle chiavi degli slider, li usiamo
+                    st.session_state['scenario_values'][feature] = st.session_state[f"slider_{feature}"]
+                
+                # 2. Calcola la previsione
                 scenario_X = np.array(
                     [st.session_state['scenario_values'][col] for col in feature_cols],
                     dtype=float
                 ).reshape(1, -1)
-
                 predicted_score = float(model.predict(scenario_X)[0])
-                
-                # Calcola il rank previsto (metodo approssimativo)
                 predicted_rank = int(df_reset['ranking_score'].max() - predicted_score + 1)
                 score_diff = predicted_score - float(uni_score_original)
-                rank_diff = int(ft_rank_original - predicted_rank) # Se rank_diff > 0, il rank è migliorato (da 10 a 8: +2)
-
-                # salva risultato in sessione (per mostrarlo nella colonna di sinistra)
+                rank_diff = int(ft_rank_original - predicted_rank)
+                
+                # 3. Salva risultato in sessione
                 st.session_state['scenario_result'] = {
                     "predicted_score": predicted_score,
                     "predicted_rank": predicted_rank,
@@ -1506,10 +1499,9 @@ with tab_scenario:
                     "rank_diff": rank_diff
                 }
 
-        # --- COLONNA SCORE: leggi il risultato dalla sessione, se presente ---
+        # --- COLONNA SCORE (Nessuna modifica necessaria qui) ---
         with col_scores:
             st.subheader("📊 Risultati")
-
             # box punteggio originale
             st.markdown(f"""
                 <div style="background-color:#f0f2f6; padding:20px; border-radius:10px; margin-bottom:15px;">
@@ -1518,22 +1510,22 @@ with tab_scenario:
                     <p style="margin:0; color:#666;">Rank #{ft_rank_original}</p>
                 </div>
             """, unsafe_allow_html=True)
-
+            
             if st.session_state['scenario_result'] is None:
                 st.info("Imposta i valori e premi **Calcola scenario**.")
             else:
-                predicted_score  = st.session_state['scenario_result']['predicted_score']
-                predicted_rank   = st.session_state['scenario_result']['predicted_rank']
-                score_diff       = st.session_state['scenario_result']['score_diff']
-                rank_diff        = st.session_state['scenario_result']['rank_diff']
-
+                predicted_score = st.session_state['scenario_result']['predicted_score']
+                predicted_rank = st.session_state['scenario_result']['predicted_rank']
+                score_diff = st.session_state['scenario_result']['score_diff']
+                rank_diff = st.session_state['scenario_result']['rank_diff']
+                
                 if abs(score_diff) < 0.5:
                     box_color, border_color, icon, status = "#e8f4f8", "#b0c4de", "➡️", "Nessun cambiamento significativo"
                 elif score_diff > 0:
                     box_color, border_color, icon, status = "#d4f8d4", "#8cd98c", "📈", "Miglioramento"
                 else:
                     box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", "Peggioramento"
-
+                    
                 st.markdown(f"""
                     <div style="background-color:{box_color}; padding:20px; border-radius:10px; border:2px solid {border_color}; margin-bottom:15px;">
                         <h4 style="margin:0; color:#555;">{icon} Punteggio Previsto</h4>
@@ -1541,12 +1533,11 @@ with tab_scenario:
                         <p style="margin:0; color:#666;">Rank #{predicted_rank}</p>
                     </div>
                 """, unsafe_allow_html=True)
-
+                
                 st.markdown(f"""
                     <div style="background-color:#fff; padding:15px; border-radius:10px; border:2px solid {border_color};">
                         <h4 style="margin:0 0 10px 0; color:#555;">Variazione</h4>
                         <p style="margin:5px 0;"><strong>Score:</strong> {score_diff:+.2f} punti</p>
-                        <p style="margin:5px 0;"><strong>Rank:</strong> {rank_diff:+d} posizioni</p>
                         <p style="margin:10px 0 0 0; color:#666; font-style:italic;">{status}</p>
                     </div>
                 """, unsafe_allow_html=True)
