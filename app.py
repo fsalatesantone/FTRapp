@@ -1422,9 +1422,11 @@ with tab_scenario:
             """Funzione di callback per resettare i valori di scenario e il risultato."""
             st.session_state['scenario_values'] = original_values.copy()
             st.session_state['scenario_result'] = None
-            # # IMPORTANTE: Resetta anche le chiavi degli slider al valore originale
-            # for feature in feature_cols:
-            #     st.session_state[f"slider_{feature}"] = original_values[feature]
+            # IMPORTANTE: Resetta anche le chiavi degli slider al valore originale
+            for feature in feature_cols:
+                #st.session_state[f"slider_{feature}"] = original_values[feature]
+                if f"slider_{feature}" in st.session_state:
+                    del st.session_state[f"slider_{feature}"]
 
         with col_reset:
             st.markdown(""); st.markdown("")
