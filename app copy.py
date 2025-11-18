@@ -103,26 +103,38 @@ def load_data_from_upload(uploaded_file, sheet_name):
         
         # Identifica le colonne chiave
         col_map = {
-            'School name': 'School name',
-            'Location, by primary campus': 'Location',
-            'Rank': 'Rank'
+            'School Name': 'name',
+            'Location, by primary campus': 'location',
+            'rank_2025': 'ranking_score'
         }
+        
+        # Elimina le colonne non necessarie se presenti
+        if 'FT_r' in df.columns:
+            df.drop(columns=['FT_r'], inplace=True)
         
         # Rinomina le colonne chiave
         df.rename(columns={k: v for k, v in col_map.items() if k in df.columns}, inplace=True)
 
         # Controlla la presenza delle colonne minime richieste
-        required_cols = ['School name', 'Rank']
+        required_cols = ['name', 'ranking_score']
         if not all(col in df.columns for col in required_cols):
-            st.error(f"Il file Excel deve contenere le colonne: '{' e '.join(col_map.keys())}' o già rinominate in 'School name' e 'Rank'.")
+            st.error(f"Il file Excel deve contenere le colonne: '{' e '.join(col_map.keys())}' o già rinominate in 'name' e 'ranking_score'.")
             return None
 
         # Inversione dei rank (100 = rank #1)
-        n_rows = 100 #df.shape[0]
         for c in df.columns:
-            # Controllo più robusto: applica l'inversione solo se 'rank' è nel nome e se il tipo è numerico
-            if 'rank' in c.lower() and pd.api.types.is_numeric_dtype(df[c]):
-                df[c] = n_rows - df[c] + 1
+            # Controllo più robusto: applica l'inversione solo se 'rank' è nel nome
+            # e se il tipo è numerico
+            if 'rank' in c and pd.api.types.is_numeric_dtype(df[c]):
+                df[c] = 100 - df[c] + 1
+
+        # Correzione variabile employed_3m_pct (se presente)
+        if 'employed_3m_pct' in df.columns:
+            df['employed_3m_pct'] = np.select(
+                [df['employed_3m_pct'] == 10],
+                [100],
+                df['employed_3m_pct']
+            )
             
         # Resetta l'upload_file (necessario per resettare il puntatore e poter rileggere)
         uploaded_file.seek(0)
@@ -142,20 +154,20 @@ def train_and_shap(df):
     random_seed = 3
     
     # Prepara i dati
-    # Assumiamo che tutte le colonne numeriche tranne 'Rank' siano feature
-    feature_cols_all = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'Rank']
-    # Rimuovi anche 'Location' che è categorica ma a volte può essere interpretata come numerica se ha valori numerici
-    feature_cols = [c for c in feature_cols_all if c not in ['School name', 'Location']] 
+    # Assumiamo che tutte le colonne numeriche tranne 'ranking_score' siano feature
+    feature_cols_all = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'ranking_score']
+    # Rimuovi anche 'location' che è categorica ma a volte può essere interpretata come numerica se ha valori numerici
+    feature_cols = [c for c in feature_cols_all if c not in ['name', 'location']] 
     
     # Rimuovi righe con NaN nelle colonne feature o target
-    df_clean = df.dropna(subset=feature_cols + ['Rank'])
+    df_clean = df.dropna(subset=feature_cols + ['ranking_score'])
     
     if len(df_clean) == 0:
         st.error("Nessun dato valido rimasto dopo la rimozione dei NaN nelle colonne feature/target.")
         return None
 
     X = df_clean[feature_cols].values
-    y = df_clean['Rank'].values
+    y = df_clean['ranking_score'].values
     
     # 1. Training XGBoost con Cross-Validation
     xgb_model_cv = xgb.XGBRegressor(
@@ -195,9 +207,9 @@ def train_and_shap(df):
     
     # Crea un DataFrame per i valori SHAP (usando df_clean per gli indici)
     shap_df = pd.DataFrame(shap_values, columns=feature_cols)
-    shap_df.insert(0, 'School name', df_clean['School name'].values)
-    shap_df.insert(1, 'Location', df_clean['Location'].values)
-    shap_df.insert(2, 'Rank', df_clean['Rank'].values)
+    shap_df.insert(0, 'name', df_clean['name'].values)
+    shap_df.insert(1, 'location', df_clean['location'].values)
+    shap_df.insert(2, 'ranking_score', df_clean['ranking_score'].values)
     shap_df.insert(3, 'predicted_score', y_pred)
     
     # Dati necessari per i plot SHAP
@@ -235,16 +247,16 @@ def pretrain_and_shap(df, perimeter):
     random_seed = 3
     
     # Prepara i dati
-    # Assumiamo che tutte le colonne numeriche tranne 'Rank' siano feature
-    feature_cols_all = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'Rank']
-    # Rimuovi anche 'Location' che è categorica ma a volte può essere interpretata come numerica se ha valori numerici
-    feature_cols = [c for c in feature_cols_all if c not in ['School name', 'Location']] 
+    # Assumiamo che tutte le colonne numeriche tranne 'ranking_score' siano feature
+    feature_cols_all = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'ranking_score']
+    # Rimuovi anche 'location' che è categorica ma a volte può essere interpretata come numerica se ha valori numerici
+    feature_cols = [c for c in feature_cols_all if c not in ['name', 'location']] 
     
     # Rimuovi righe con NaN nelle colonne feature o target
-    df_clean = df.dropna(subset=feature_cols + ['Rank'])
+    df_clean = df.dropna(subset=feature_cols + ['ranking_score'])
     
     X = df_clean[feature_cols].values
-    y = df_clean['Rank'].values
+    y = df_clean['ranking_score'].values
 
     if perimeter == 'Master in Management':
         lab = 'MIM'
@@ -281,9 +293,9 @@ def pretrain_and_shap(df, perimeter):
     
     # Crea un DataFrame per i valori SHAP (usando df_clean per gli indici)
     shap_df = pd.DataFrame(shap_values, columns=feature_cols)
-    shap_df.insert(0, 'School name', df_clean['School name'].values)
-    shap_df.insert(1, 'Location', df_clean['Location'].values)
-    shap_df.insert(2, 'Rank', df_clean['Rank'].values)
+    shap_df.insert(0, 'name', df_clean['name'].values)
+    shap_df.insert(1, 'location', df_clean['location'].values)
+    shap_df.insert(2, 'ranking_score', df_clean['ranking_score'].values)
     shap_df.insert(3, 'predicted_score', y_pred)
     
     # Dati necessari per i plot SHAP
@@ -328,10 +340,10 @@ def plot_ranked_variable(df, selected_variable, highlight_unis, title, color_var
     df_plot = df.sort_values(selected_variable, ascending=True).reset_index(drop=True)
     
     # Crea la colonna colore per l'evidenziazione
-    df_plot['Color'] = df_plot['School name'].apply(lambda x: 'Highlight' if x in highlight_unis else 'Default')
+    df_plot['Color'] = df_plot['name'].apply(lambda x: 'Highlight' if x in highlight_unis else 'Default')
 
     # Ordine delle categorie per l'asse y
-    category_order = df_plot['School name'].tolist()
+    category_order = df_plot['name'].tolist()
 
     # Nuovi colori
     color_discrete_map = {
@@ -343,14 +355,14 @@ def plot_ranked_variable(df, selected_variable, highlight_unis, title, color_var
     fig = px.bar(
         df_plot,
         x=selected_variable,
-        y='School name',
+        y='name',
         orientation='h',
         title=title,
-        labels={selected_variable: selected_variable, 'School name': 'Università'},
+        labels={selected_variable: selected_variable, 'name': 'Università'},
         color='Color',
         color_discrete_map=color_discrete_map,
-        category_orders={'School name': category_order},
-        hover_data={'Rank': ':.0f', selected_variable: ':.2f'} # Aggiornato a .0f per il rank
+        category_orders={'name': category_order},
+        hover_data={'ranking_score': ':.0f', selected_variable: ':.2f'} # Aggiornato a .0f per il rank
     )
     
     fig.update_layout(
@@ -406,13 +418,13 @@ def plot_shap_dependence(feat_idx, shap_values_extended, X_with_ranking, feature
     
     fig, ax = plt.subplots(figsize=(8, 6))
     
-    # Utilizza 'Rank' come interaction_index per colorare i punti in base al target
+    # Utilizza 'ranking_score' come interaction_index per colorare i punti in base al target
     shap.dependence_plot(
         feat_idx, 
         shap_values_extended,  
         X_with_ranking, 
         feature_names=feature_cols_with_ranking,
-        interaction_index='Rank',  
+        interaction_index='ranking_score',  
         ax=ax,
         show=False
     )
@@ -428,8 +440,8 @@ def plot_shap_dependence(feat_idx, shap_values_extended, X_with_ranking, feature
 def plot_shap_waterfall(uni_idx, explainer, shap_values, X, df, feature_cols):
     """Grafico SHAP Waterfall Plot per una singola università - Matplotlib"""
     
-    uni_name = df.iloc[uni_idx]['School name']
-    uni_score = df.iloc[uni_idx]['Rank']
+    uni_name = df.iloc[uni_idx]['name']
+    uni_score = df.iloc[uni_idx]['ranking_score']
     
     fig, ax = plt.subplots(figsize=(10, 8))
     
@@ -571,35 +583,35 @@ with tab_esplorazione:
         st.header(f"Tabella di input {st.session_state['perimeter']}")
         
         # Visualizzazione Tabella Completa
-        st.markdown(f"Dati caricati e pre-processati (Rank: {df['Rank'].max():.0f} = Rank #1).")
+        st.markdown(f"Dati caricati e pre-processati (Ranking Score: {df['ranking_score'].max():.0f} = Rank #1).")
         st.markdown(f"*N. di osservazioni:* `{len(df)}` | *N. variabili:* `{len(df.columns)}`")
         st.dataframe(df, use_container_width=True, hide_index=True)
         popover = st.popover("💡 Data dictionary")
         with popover:
             st.caption("Legenda:")
             st.markdown("""
-            * **School name**: Nome dell'università.
-            * **Location**: Nazione.
-            * **Rank**: Posizione nel ranking del Financial Times (100 = rank #1).
-            * **Weighted salary (US$)**: Salario medio ponderato in USD (tre anni dopo il completamento del Master) per i laureati. I salari sono convertiti in dollari USA usando il purchasing power parity (PPP) per tener conto delle differenze dei costi di vita tra paesi. Inoltre, vengono applicate ponderazioni per ridurre la distorsione di salari estremi (alto o basso).
-            * **Salary percentage increase**: Percentuale media di aumento salariale tra il salario iniziale (subito dopo il completamento del master) e il salario attuale (a tre anni). Spesso metà del peso è sull'aumento assoluto e metà sulla percentuale relativa.
-            * **Value for money rank**: Classifica (rank) che misura il "rapporto qualità/prezzo" del programma, tenendo in considerazione il salario atteso, la durata del corso, le tasse e i costi opportunità (es. reddito perso durante il corso).
-            * **Career progress rank**: Classifica basata sul progresso di carriera degli alumni: cambi di seniority, dimensione dell'organizzazione in cui lavorano ora rispetto a prima del master, aumento di responsabilità, e mobilità nei ruoli.
-            * **Aims achieved (%)**: Percentuale di alumni che riportano di aver raggiunto gli obiettivi professionali / personali dichiarati all'inizio del master (ovvero quanto il corso ha soddisfatto le aspettative).
-            * **Careers service rank**: Classifica del servizio carriera della business school (ufficio placement, supporto, network, opportunità offerte) così come percepito dagli alumni / dati forniti.
-            * **Alumni network rank**: Classifica della forza / efficacia della rete alumni (networking, collegamenti, supporto, opportunità grazie agli alumni).
-            * **Employed at three months (%)**: Percentuale di alumni impiegati (in un lavoro rilevante) entro 3 mesi dal completamento del master.
-            * **Female faculty (%)**: Percentuale di docenti (facoltà) di genere femminile nella scuola / nel programma.
-            * **Female students (%)**: Percentuale di studenti di genere femminile nel programma del master.
-            * **Women on board (%)**: Percentuale di membri femminili nel consiglio di amministrazione (board) della business school.
-            * **International faculty (%)**: Percentuale di docenti con cittadinanza non locale / internazionale (cioè provenienti da paesi diversi).
-            * **International students (%)**: Percentuale di studenti con cittadinanza internazionale (non del paese sede) nel programma.
-            * **International board (%)**: Percentuale di membri del board della scuola con cittadinanza internazionale (non del paese sede).
-            * **International work mobility rank**: Classifica della mobilità internazionale del lavoro: misura quanti alumni si spostano in un paese diverso da quello d'origine per lavoro dopo il master (cambi di paese di impiego).
-            * **International course experience rank**: Classifica dell'esperienza internazionale del corso: quanto la componente internazionale è presente nei contenuti, esperienze, scambi, mobilità nel corso, progetti internazionali.
-            * **Faculty with doctorates (%)**: Percentuale di docenti che possiedono un dottorato (PhD) o titolo equivalente.
-            * **ESG and net zero teaching rank**: Classifica legata alla sostenibilità ed ESG (Environmental, Social, Governance), specialmente per l'impegno della scuola verso obiettivi "net zero" o di neutralità carbonica / pratiche green integrate.
-            * **Carbon footprint rank**: Classifica basata sull'impronta di carbonio della scuola (emissioni dirette e indirette). Misura quanto la scuola è "virtuosa" dal punto di vista ambientale.
+            * **name**: Nome dell'università.
+            * **location**: Nazione.
+            * **ranking_score**: Posizione nel ranking del Financial Times (100 = rank #1).
+            * **weighted_salary_usd**: Salario medio ponderato in USD (tre anni dopo il completamento del Master) per i laureati. I salari sono convertiti in dollari USA usando il purchasing power parity (PPP) per tener conto delle differenze dei costi di vita tra paesi. Inoltre, vengono applicate ponderazioni per ridurre la distorsione di salari estremi (alto o basso).
+            * **salary_increase_pct**: Percentuale media di aumento salariale tra il salario iniziale (subito dopo il completamento del master) e il salario attuale (a tre anni). Spesso metà del peso è sull'aumento assoluto e metà sulla percentuale relativa.
+            * **value_for_money_rank**: Classifica (rank) che misura il "rapporto qualità/prezzo" del programma, tenendo in considerazione il salario atteso, la durata del corso, le tasse e i costi opportunità (es. reddito perso durante il corso).
+            * **career_progress_rank**: Classifica basata sul progresso di carriera degli alumni: cambi di seniority, dimensione dell'organizzazione in cui lavorano ora rispetto a prima del master, aumento di responsabilità, e mobilità nei ruoli.
+            * **aims_achieved_pct**: Percentuale di alumni che riportano di aver raggiunto gli obiettivi professionali / personali dichiarati all'inizio del master (ovvero quanto il corso ha soddisfatto le aspettative).
+            * **careers_service_rank**: Classifica del servizio carriera della business school (ufficio placement, supporto, network, opportunità offerte) così come percepito dagli alumni / dati forniti.
+            * **alumni_network_rank**: Classifica della forza / efficacia della rete alumni (networking, collegamenti, supporto, opportunità grazie agli alumni).
+            * **employed_3m_pct**: Percentuale di alumni impiegati (in un lavoro rilevante) entro 3 mesi dal completamento del master.
+            * **female_faculty_pct**: Percentuale di docenti (facoltà) di genere femminile nella scuola / nel programma.
+            * **female_students_pct**: Percentuale di studenti di genere femminile nel programma del master.
+            * **women_on_board_pct**: Percentuale di membri femminili nel consiglio di amministrazione (board) della business school.
+            * **international_faculty_pct**: Percentuale di docenti con cittadinanza non locale / internazionale (cioè provenienti da paesi diversi).
+            * **international_students_pct**: Percentuale di studenti con cittadinanza internazionale (non del paese sede) nel programma.
+            * **international_board_pct**: Percentuale di membri del board della scuola con cittadinanza internazionale (non del paese sede).
+            * **intl_work_mobility_rank**: Classifica della mobilità internazionale del lavoro: misura quanti alumni si spostano in un paese diverso da quello d'origine per lavoro dopo il master (cambi di paese di impiego).
+            * **intl_course_experience_rank**: Classifica dell'esperienza internazionale del corso: quanto la componente internazionale è presente nei contenuti, esperienze, scambi, mobilità nel corso, progetti internazionali.
+            * **faculty_doctorates_pct**: Percentuale di docenti che possiedono un dottorato (PhD) o titolo equivalente.
+            * **esg_netzero_rank**: Classifica legata alla sostenibilità ed ESG (Environmental, Social, Governance), specialmente per l'impegno della scuola verso obiettivi "net zero" o di neutralità carbonica / pratiche green integrate.
+            * **carbon_footprint_rank**: Classifica basata sull'impronta di carbonio della scuola (emissioni dirette e indirette). Misura quanto la scuola è "virtuosa" dal punto di vista ambientale.
             """)
         st.markdown("---")
         
@@ -608,11 +620,11 @@ with tab_esplorazione:
         with col_sel:
             # Trova l'indice della LUISS (per preselezionarla)
             luiss_name = "Luiss University/Luiss Business School"
-            default_unis = [luiss_name] if luiss_name in df['School name'].unique() else df['School name'].unique()[:1].tolist()
+            default_unis = [luiss_name] if luiss_name in df['name'].unique() else df['name'].unique()[:1].tolist()
 
             selected_unis = st.multiselect(
                 "Seleziona Università da evidenziare nei grafici:",
-                sorted(df['School name'].unique()),
+                sorted(df['name'].unique()),
                 default=default_unis,
                 key='exp_highlight_unis'
             )
@@ -621,15 +633,15 @@ with tab_esplorazione:
         col_rank_chart, col_var_chart = st.columns(2)
 
         with col_rank_chart:
-            # Grafico di Classifica Generale (Rank)
+            # Grafico di Classifica Generale (Ranking Score)
             st.subheader("Classifica Generale")
             st.markdown("")
             
             fig_rank = plot_ranked_variable(
                 df,
-                'Rank',
+                'ranking_score',
                 selected_unis,
-                "Classifica per Rank"
+                "Classifica per Ranking Score"
             )
             st.plotly_chart(fig_rank, use_container_width=True)
         
@@ -638,12 +650,12 @@ with tab_esplorazione:
             st.subheader("Classifica per Variabile")
             
             # Filtra le colonne numeriche disponibili per i plot
-            numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'Rank' and c != 'School name']
+            numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'ranking_score' and c != 'name']
             
             selected_variable = st.selectbox(
                 "Seleziona la variabile per definire la classifica:",
                 numeric_cols,
-                index=numeric_cols.index('Weighted salary (US$)') if 'Weighted salary (US$)' in numeric_cols else 0,
+                index=numeric_cols.index('weighted_salary_usd') if 'weighted_salary_usd' in numeric_cols else 0,
                 key='exp_variable_select'
             )
             
@@ -716,7 +728,7 @@ with tab_modello:
             X_with_ranking = shap_data['X_with_ranking']
             shap_values_extended = shap_data['shap_values_extended']
             
-            feature_cols_with_ranking = feature_cols + ['Rank']
+            feature_cols_with_ranking = feature_cols + ['ranking_score']
             
             st.markdown("---")
             st.header("Stima del Modello")
@@ -733,7 +745,7 @@ with tab_modello:
             with col_model:
                 st.subheader("Performance del Modello XGBoost")
                 st.markdown(f"""
-                Il modello è stato addestrato per prevedere il **Rank** (dove {df['Rank'].max():.0f} è il rank #1).
+                Il modello è stato addestrato per prevedere il **Ranking Score** (dove {df['ranking_score'].max():.0f} è il rank #1).
                 * **R²:** `{final_results['R2']:.4f}`
                 * **RMSE:** `{final_results['RMSE']:.4f}`
                 * **R² medio (Cross-Validation):** `{cv_results['R2_mean']:.4f} (+/- {cv_results['R2_std']:.4f})`
@@ -748,13 +760,13 @@ with tab_modello:
 
             with col_bar:
                 st.subheader("Feature Importance")
-                st.caption("Mostra le feature ordinate in modo descrescente per importanza media assoluta nel determinare il Rank.")
+                st.caption("Mostra le feature ordinate in modo descrescente per importanza media assoluta nel determinare il Ranking Score.")
                 # Grafico a barre con Plotly
                 st.plotly_chart(plot_shap_summary_bar(shap_values, feature_cols), use_container_width=True)
 
             with col_beeswarm:
                 st.subheader("SHAP Beeswarm Plot - Distribuzione degli Effetti")
-                st.caption("Ogni punto è un'università. Il colore indica il valore della feature, la posizione orizzontale indica l'impatto sul Rank (valore SHAP).")
+                st.caption("Ogni punto è un'università. Il colore indica il valore della feature, la posizione orizzontale indica l'impatto sul Ranking Score (valore SHAP).")
                 # Grafico Beeswarm (Matplotlib, usa la cache)
                 st.pyplot(plot_shap_beeswarm(shap_values, X, feature_cols), use_container_width=True)
 
@@ -768,8 +780,8 @@ with tab_modello:
                 max_features = len(shap_values[0])
                 top_n_var = st.slider("Numero di feature da mostrare:", 1, max_features, min(9, max_features), step=1, key='mod_slider_features')
                 
-            st.subheader(f"SHAP Dependence Plots (Interazioni con il Rank) - Top {top_n_var} Features")
-            st.caption("Questi grafici mostrano l'effetto di una singola feature sul Rank, colorando i punti in base al Rank effettivo di quell'università.")
+            st.subheader(f"SHAP Dependence Plots (Interazioni con il Ranking Score) - Top {top_n_var} Features")
+            st.caption("Questi grafici mostrano l'effetto di una singola feature sul Ranking Score, colorando i punti in base al Ranking Score effettivo di quell'università.")
             
             # Trova gli indici delle top_n_var feature più importanti
             feature_importance = np.abs(shap_values).mean(axis=0)
@@ -817,7 +829,7 @@ with tab_drilldown:
 
         with col_select_uni:
             # Selezione dell'università tramite menu a tendina
-            uni_names = sorted(df['School name'].unique())
+            uni_names = sorted(df['name'].unique())
             
             luiss_name = "Luiss University/Luiss Business School"
             default_index = list(uni_names).index(luiss_name) if luiss_name in uni_names else 0
@@ -831,9 +843,9 @@ with tab_drilldown:
         
         # Estrai i dati per l'università selezionata (per il Drill-Down iniziale)
         # Nota: usiamo l'indice in df_reset per l'accesso a X e shap_values
-        uni_idx_in_X_shap = df_reset.query(f"`School name` == '{selected_uni_name}'").index[0] 
-        uni_score = df_reset.iloc[uni_idx_in_X_shap]['Rank']
-        ft_rank = int(df_reset['Rank'].max() - uni_score + 1)
+        uni_idx_in_X_shap = df_reset.query(f"name == '{selected_uni_name}'").index[0] 
+        uni_score = df_reset.iloc[uni_idx_in_X_shap]['ranking_score']
+        ft_rank = int(df_reset['ranking_score'].max() - uni_score + 1)
 
         st.header(f"**{selected_uni_name}** - Rank #{ft_rank} (Score: {uni_score:.0f})")
 
@@ -914,15 +926,15 @@ with tab_drilldown:
         col_filter_loc, col_select_uni_comp, col_empty_sel = st.columns([1, 2, 3])
         
         # Opzione 1: Filtro per Area Geografica
-        locations = ['Tutte le aree geografiche'] + list(sorted(df['Location'].unique()))
+        locations = ['Tutte le aree geografiche'] + list(sorted(df['location'].unique()))
         with col_filter_loc:
             selected_location = st.selectbox("Filtra per Area Geografica:", locations, key='comp_location_filter')
             
         # Applica il filtro geografico prima della multiselezione
-        df_filtered = df[df['Location'] == selected_location] if selected_location != 'Tutte le aree geografiche' else df
+        df_filtered = df[df['location'] == selected_location] if selected_location != 'Tutte le aree geografiche' else df
         
         # Rimuovi l'università di riferimento dall'elenco dei competitor
-        competitor_uni_names = sorted(df_filtered.query(f"`School name` != '{selected_uni_name}'")['School name'].unique())
+        competitor_uni_names = sorted(df_filtered.query(f"name != '{selected_uni_name}'")['name'].unique())
         
         with col_select_uni_comp:
             # Opzione 2: Multiselezione dei competitor
@@ -942,16 +954,16 @@ with tab_drilldown:
             uni_names_to_compare = [selected_uni_name] + selected_competitors
             
             # Filtra i dati per le università selezionate
-            df_comparison_temp = df[df['School name'].isin(uni_names_to_compare)].drop_duplicates(subset=['School name'])
+            df_comparison_temp = df[df['name'].isin(uni_names_to_compare)].drop_duplicates(subset=['name'])
             
-            # Imposta l'indice a 'School name'
-            df_comparison = df_comparison_temp.set_index('School name', verify_integrity=True) 
+            # Imposta l'indice a 'name'
+            df_comparison = df_comparison_temp.set_index('name', verify_integrity=True) 
             
             # Riordina le colonne in base alla lista ordinata uni_names_to_compare
             df_comparison = df_comparison.reindex(uni_names_to_compare) # <--- CORREZIONE ORDINE TABELLA
             
             # Colonne iniziali fisse e feature
-            initial_cols = ['Rank', 'Location']
+            initial_cols = ['ranking_score', 'location']
             all_model_features = feature_cols
             unique_model_features = [col for col in all_model_features if col not in initial_cols]
             display_cols = initial_cols + unique_model_features
@@ -959,10 +971,10 @@ with tab_drilldown:
             df_comparison_fixed = df_comparison[display_cols].copy()
             
             # Applica formattazione (assicurati che le colonne esistano prima di formattare)
-            if 'Rank' in df_comparison_fixed.columns:
-                 df_comparison_fixed['Rank'] = df_comparison_fixed['Rank'].apply(lambda x: f"{x:.0f}")
-            if 'Weighted salary (US$)' in df_comparison_fixed.columns:
-                 df_comparison_fixed['Weighted salary (US$)'] = df_comparison_fixed['Weighted salary (US$)'].apply(lambda x: f"${x:,.0f}")
+            if 'ranking_score' in df_comparison_fixed.columns:
+                 df_comparison_fixed['ranking_score'] = df_comparison_fixed['ranking_score'].apply(lambda x: f"{x:.0f}")
+            if 'weighted_salary_usd' in df_comparison_fixed.columns:
+                 df_comparison_fixed['weighted_salary_usd'] = df_comparison_fixed['weighted_salary_usd'].apply(lambda x: f"${x:,.0f}")
             
             numeric_feature_cols = [c for c in unique_model_features if pd.api.types.is_numeric_dtype(df_comparison_fixed[c])]
             for col in numeric_feature_cols:
@@ -981,7 +993,7 @@ with tab_drilldown:
             
             # --- 2. Waterfall Plot per ciascun Competitor (Ordine e Indicizzazione Corretti) ---
             st.subheader("Waterfall Plot SHAP per Competitor")
-            st.caption("Ogni grafico mostra la decomposizione del Rank previsto. L'ordine dei grafici riflette l'ordine delle colonne nella tabella.")
+            st.caption("Ogni grafico mostra la decomposizione del Ranking Score previsto. L'ordine dei grafici riflette l'ordine delle colonne nella tabella.")
             
             n_cols_waterfall = 4 
             # Qui usiamo un numero fisso di 4 colonne, Streamlit gestirà il wrapping se ci sono meno di 4 plot.
@@ -992,7 +1004,7 @@ with tab_drilldown:
                 
                 # TROVA L'INDICE CORRETTO IN X/SHAP_VALUES usando df_reset
                 try:
-                    comp_idx_in_X_shap = df_reset.query(f"`School name` == '{competitor_name}'").index[0]
+                    comp_idx_in_X_shap = df_reset.query(f"name == '{competitor_name}'").index[0]
                 except IndexError:
                     # Gestisce il caso (improbabile se i dati sono coerenti) in cui il nome non si trovi in df_reset
                     st.error(f"Errore: L'università {competitor_name} non è stata trovata nel dataset di training pulito.")
@@ -1000,8 +1012,8 @@ with tab_drilldown:
                 
                 # Usa solo le colonne disponibili (max 4)
                 with waterfall_cols[i % n_cols_waterfall]:
-                    comp_score = df_reset.iloc[comp_idx_in_X_shap]['Rank']
-                    comp_rank = int(df_reset['Rank'].max() - comp_score + 1)
+                    comp_score = df_reset.iloc[comp_idx_in_X_shap]['ranking_score']
+                    comp_rank = int(df_reset['ranking_score'].max() - comp_score + 1)
                     st.markdown(f"**{competitor_name}** (Rank #{comp_rank}, Score: {comp_score:.0f})")
                     
                     # Usa comp_idx_in_X_shap per accedere a X e shap_values
@@ -1030,7 +1042,7 @@ with tab_relazioni:
         explainer = shap_data['explainer']
         shap_values = shap_data['shap_values']
         X = shap_data['X']
-        numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c not in ['Rank', 'School name']]
+        numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c not in ['ranking_score', 'name']]
 
         col_scelta_corr, col_popover_corr, col_empty = st.columns([2, 2, 6])
         with col_scelta_corr:
@@ -1110,6 +1122,18 @@ with tab_relazioni:
                         unsafe_allow_html=True
                     )
 
+            # for _, row in corr_top.iterrows():
+            #     color = "#d4f8d4" if row['Correlation'] > 0 else "#ffe6e6"
+            #     border = "#8cd98c" if row['Correlation'] > 0 else "#ff9999"
+            #     st.markdown(
+            #         f"""
+            #         <div style="background-color:{color};padding:5px;border-radius:5px;
+            #                     margin-bottom:3px;border:1px solid {border};">
+            #             <b>{row['Feature 1']} ↔ {row['Feature 2']}</b>: {row['Correlation']:+.2f}
+            #         </div>
+            #         """,
+            #         unsafe_allow_html=True
+            #     )
         with col_corr_grafo:
             st.markdown("### 🕸️ Grafo delle correlazioni")
 
@@ -1354,7 +1378,7 @@ with tab_relazioni:
 with tab_scenario:
     st.markdown("---")
     st.markdown("## 🧮 Scenario Analysis")
-    st.caption("Modifica i valori delle feature per simulare scenari alternativi e vedere l'impatto sul Rank previsto.")
+    st.caption("Modifica i valori delle feature per simulare scenari alternativi e vedere l'impatto sul Ranking Score previsto.")
     if st.session_state.get('shap_df') is None:
         st.warning("Per l'analisi di Scenario, devi prima addestrare il modello nel Tab 'Analisi Globale Modello (SHAP)'.")
     else:
@@ -1373,13 +1397,13 @@ with tab_scenario:
         # --- Selezione università ---
         col_select_uni_scenario, col_empty, col_reset = st.columns([2, 3, 1])
         with col_select_uni_scenario:
-            uni_names = sorted(df['School name'].unique())
+            uni_names = sorted(df['name'].unique())
             luiss_name = "Luiss University/Luiss Business School"
             default_index = list(uni_names).index(luiss_name) if luiss_name in uni_names else 0
             selected_uni_name = st.selectbox("Seleziona Università:", uni_names, index=default_index, key='uni_scenario_select')
-        uni_idx = df_reset.index[df_reset['School name'] == selected_uni_name][0]
-        uni_score_original = float(df_reset.iloc[uni_idx]['Rank'])
-        ft_rank_original = int(df_reset['Rank'].max() - uni_score_original + 1)
+        uni_idx = df_reset.index[df_reset['name'] == selected_uni_name][0]
+        uni_score_original = float(df_reset.iloc[uni_idx]['ranking_score'])
+        ft_rank_original = int(df_reset['ranking_score'].max() - uni_score_original + 1)
         # valori originali feature
         df_features = pd.DataFrame(X, columns=feature_cols)
         original_values = {col: float(df_features.iloc[uni_idx][col]) for col in feature_cols}
@@ -1434,7 +1458,7 @@ with tab_scenario:
                     col_label, col_slider = st.columns([1, 4])
                     
                     # Calcolo min/max/step
-                    if feature == 'Weighted salary (US$)':
+                    if feature == 'weighted_salary_usd':
                         min_val = float(round(float(df_features[feature].min()*0.8) / 100) * 100)
                         max_val = float(round(float(df_features[feature].max()*1.2) / 100) * 100)
                         step = 100.0
@@ -1481,7 +1505,7 @@ with tab_scenario:
                     dtype=float
                 ).reshape(1, -1)
                 predicted_score = float(model.predict(scenario_X)[0])
-                predicted_rank = int(df_reset['Rank'].max() - predicted_score + 1)
+                predicted_rank = int(df_reset['ranking_score'].max() - predicted_score + 1)
                 score_diff = predicted_score - float(uni_score_original)
                 rank_diff = int(ft_rank_original - predicted_rank)
                 
