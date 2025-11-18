@@ -118,7 +118,7 @@ def load_data_from_upload(uploaded_file, sheet_name):
             return None
 
         # Inversione dei rank (100 = rank #1)
-        n_rows = 100 #df.shape[0]
+        n_rows = df.shape[0]
         for c in df.columns:
             # Controllo più robusto: applica l'inversione solo se 'rank' è nel nome e se il tipo è numerico
             if 'rank' in c.lower() and pd.api.types.is_numeric_dtype(df[c]):
