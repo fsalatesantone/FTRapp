@@ -19,7 +19,6 @@ import streamlit.components.v1 as components
 import networkx as nx
 from sklearn.feature_selection import mutual_info_regression
 import itertools
-import re
 
 # --- Configurazione Iniziale di Streamlit ---
 st.set_page_config(layout="wide", page_title="Analisi Ranking FT (SHAP)")
@@ -88,7 +87,7 @@ def get_sheet_names(uploaded_file):
         st.error(f"Errore nella lettura dei nomi dei fogli: {e}")
         return []
 
-def load_data_from_upload(uploaded_file, sheet_name, invert_rank: bool = True):
+def load_data_from_upload(uploaded_file, sheet_name):
     """Carica e pre-processa i dati dal file Excel caricato."""
     if uploaded_file is None or sheet_name is None:
         return None
@@ -98,6 +97,7 @@ def load_data_from_upload(uploaded_file, sheet_name, invert_rank: bool = True):
         df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
         
         # --- Pulizia e Pre-Elaborazione (Come nel codice originale) ---
+        
         # Cerca colonne per l'eliminazione e la rinomina (resilienza a nomi non esatti)
         # Assumiamo che il file caricato abbia la stessa struttura del file originale
         
@@ -118,12 +118,11 @@ def load_data_from_upload(uploaded_file, sheet_name, invert_rank: bool = True):
             return None
 
         # Inversione dei rank (100 = rank #1)
-        if invert_rank:
-            n_rows = df.shape[0]
-            for c in df.columns:
-                # Controllo più robusto: applica l'inversione solo se 'rank' è nel nome e se il tipo è numerico
-                if 'rank' in c.lower() and pd.api.types.is_numeric_dtype(df[c]):
-                    df[c] = n_rows - df[c] + 1
+        n_rows = df.shape[0]
+        for c in df.columns:
+            # Controllo più robusto: applica l'inversione solo se 'rank' è nel nome e se il tipo è numerico
+            if 'rank' in c.lower() and pd.api.types.is_numeric_dtype(df[c]):
+                df[c] = n_rows - df[c] + 1
             
         # Resetta l'upload_file (necessario per resettare il puntatore e poter rileggere)
         uploaded_file.seek(0)
@@ -133,94 +132,6 @@ def load_data_from_upload(uploaded_file, sheet_name, invert_rank: bool = True):
     except Exception as e:
         st.error(f"Errore durante la pre-elaborazione dei dati: {e}")
         return None
-    
-
-# Normalizza il nome delle colonne (per gestire la colorazione dei grafi delle variabili)
-def norm_col(s: str) -> str:
-    s = str(s).strip().lower()
-    s = re.sub(r"\s+", " ", s)
-    return s
-
-# Tipo di variabili (per gestire la colorazione dei grafi delle variabili)
-def build_var_type_map(df: pd.DataFrame) -> dict:
-    """
-    Ritorna dict: {colonna_originale -> 'Alumni survey' | 'School survey' | 'Unknown'}
-    Usa la tua logica di matching su nome normalizzato.
-    """
-    var_type = {}
-    for col in df.columns:
-        c = norm_col(col)
-
-        # --- Alumni survey ---
-        if 'salary today' in c:
-            var_type[col] = 'Alumni survey'
-        elif 'weighted salary' in c:
-            var_type[col] = 'Alumni survey'
-        elif 'salary' in c and 'increase' in c:
-            var_type[col] = 'Alumni survey'
-        elif 'value for money' in c:
-            var_type[col] = 'Alumni survey'
-        elif 'career progress' in c:
-            var_type[col] = 'Alumni survey'
-        elif 'aims achieved' in c:
-            var_type[col] = 'Alumni survey'
-        elif 'alumni network' in c:
-            var_type[col] = 'Alumni survey'
-        elif 'career' in c and 'service' in c:
-            var_type[col] = 'Alumni survey'
-        elif 'international work mobility' in c:
-            var_type[col] = 'Alumni survey'
-
-        # --- School survey ---
-        elif 'international faculty' in c:
-            var_type[col] = 'School survey'
-        elif 'female faculty' in c:
-            var_type[col] = 'School survey'
-        elif 'faculty with doctorates' in c:
-            var_type[col] = 'School survey'
-        elif 'women on board' in c:
-            var_type[col] = 'School survey'
-        elif 'international board' in c:
-            var_type[col] = 'School survey'
-        elif 'female student' in c:
-            var_type[col] = 'School survey'
-        elif 'international student' in c:
-            var_type[col] = 'School survey'
-        elif 'employed' in c and 'months' in c:
-            var_type[col] = 'School survey'
-        elif 'international course experience' in c:
-            var_type[col] = 'School survey'
-        elif 'esg' in c:
-            var_type[col] = 'School survey'
-        elif 'carbon footprint' in c:
-            var_type[col] = 'School survey'
-        else:
-            var_type[col] = 'Unknown'
-
-    return var_type
-
-# Resetta tutto quando viene cambiato il toggle
-def reset_app_state_on_toggle():
-    # Cancella dati e risultati (lascia eventualmente altre preferenze)
-    st.session_state['df'] = None
-    st.session_state['shap_df'] = None
-    st.session_state['perimeter'] = None
-    st.session_state['model_results'] = None
-    st.session_state['shap_data'] = None
-    st.session_state['training_time'] = None
-
-    # Opzionale: resetta anche selezioni UI che dipendono dai dati
-    for k in ['sheet_select', 'exp_highlight_unis', 'exp_variable_select',
-              'uni_drilldown_select', 'comp_location_filter', 'comp_multiselect',
-              'uni_scenario_select', 'rel_corr_method', 'rel_corr_grafo_slider',
-              'rel_mi_grafo_slider', 'mod_slider_features']:
-        if k in st.session_state:
-            del st.session_state[k]
-
-    # Opzionale: elimina tutti gli slider dello scenario (chiavi dinamiche)
-    for k in list(st.session_state.keys()):
-        if k.startswith("slider_"):
-            del st.session_state[k]
 
 # --- Funzione di Training e SHAP (Memorizzata in session_state) ---
 
@@ -318,32 +229,6 @@ def train_and_shap(df):
     st.success(f"Modello XGBoost addestrato con successo in **{execution_time:.2f} secondi** ⏱️")
 
 
-def get_lab_and_mode(perimeter: str, invert_rank: bool):
-    """
-    perimeter: 'Master in Management' | 'Master in Finance'
-    invert_rank: toggle (True => Rank invertito)
-    """
-    if perimeter == 'Master in Management':
-        lab = 'MIM'
-    elif perimeter == 'Master in Finance':
-        lab = 'MIF'
-    else:
-        # se carichi un file custom e non hai perimeter, decidi cosa fare:
-        # a) errore, b) fallback, c) selettore UI
-        raise ValueError("Perimeter non riconosciuto. Usa i dati predefiniti MIM/MIF oppure imposta perimeter.")
-
-    mode = 'inverted' if invert_rank else 'default'
-    return lab, mode
-
-
-def get_model_paths(lab: str, mode: str, base_dir: str = "./data"):
-    model_path = f"{base_dir}/{lab}_{mode}_xgb_model_final.pkl"
-    r2_path = f"{base_dir}/{lab}_{mode}_cv_scores_r2.npy"
-    rmse_path = f"{base_dir}/{lab}_{mode}_cv_scores_rmse.npy"
-    return model_path, r2_path, rmse_path
-
-
-
 def pretrain_and_shap(df, perimeter):
     """Carica il modello pre-addestrato di XGBoost e calcola i valori SHAP. Salva in session_state."""
     start_time = time.time()
@@ -361,24 +246,14 @@ def pretrain_and_shap(df, perimeter):
     X = df_clean[feature_cols].values
     y = df_clean['Rank'].values
 
-    # --- Scegli lab/mode in base a perimeter + toggle invert_rank ---
-    invert_rank = st.session_state.get("invert_rank", True)
-    try:
-        lab, mode = get_lab_and_mode(perimeter, invert_rank)
-    except ValueError as e:
-        st.error(str(e))
-        return None
-
-    model_path, r2_path, rmse_path = get_model_paths(lab, mode)
-
-    # --- Carica CV scores ---
-    try:
-        cv_scores_r2 = np.load(r2_path)
-        cv_scores_rmse = np.load(rmse_path)
-    except Exception as e:
-        st.error(f"Errore nel caricamento dei file CV ({lab}/{mode}): {e}")
-        return None
-
+    if perimeter == 'Master in Management':
+        lab = 'MIM'
+    elif perimeter == 'Master in Finance':
+        lab = 'MIF'
+    
+    # Carica i risultati della CV
+    cv_scores_r2 = np.load(f"./data/{lab}_cv_scores_r2.npy")
+    cv_scores_rmse = np.load(f"./data/{lab}_cv_scores_rmse.npy")
 
     cv_results = {
         'R2_mean': cv_scores_r2.mean(),
@@ -388,14 +263,17 @@ def pretrain_and_shap(df, perimeter):
     }
 
     # 2. Caricamento Modello Finale e inferenza su tutto il dataset
-    xgb_model = joblib.load(model_path)
-    # xgb_model.fit(X, y)
+    xgb_model = joblib.load(f"./data/{lab}_xgb_model_final.pkl")
+    xgb_model.fit(X, y)
     y_pred = xgb_model.predict(X)
     
     final_r2 = r2_score(y, y_pred)
     final_rmse = np.sqrt(mean_squared_error(y, y_pred))
 
-    final_results = {'R2': final_r2, 'RMSE': final_rmse}
+    final_results = {
+        'R2': final_r2,
+        'RMSE': final_rmse
+    }
 
     # 3. SHAP ANALYSIS
     explainer = shap.TreeExplainer(xgb_model)
@@ -433,7 +311,7 @@ def pretrain_and_shap(df, perimeter):
         'shap_values_extended': shap_values_extended
     }
     st.session_state['training_time'] = execution_time
-    st.success(f"Modello XGBoost caricato: **{lab} / {mode}** in **{execution_time:.2f}s** ⏱️")
+    st.success(f"Modello XGBoost ({perimeter}) caricato con successo in **{execution_time:.2f} secondi** ⏱️")
 
 
 # --- Funzioni di Plotting (Rimosse decorazioni e logica di caricamento) ---
@@ -608,14 +486,6 @@ tab_esplorazione, tab_modello, tab_drilldown, tab_relazioni, tab_scenario = st.t
 # -----------------------------------------------------
 with tab_esplorazione:
     st.header("Caricamento Dati di Input")
-
-    invert_rank = st.toggle(
-        "Inverti Rank (valore alto = posizione migliore)",
-        value=True, 
-        key="invert_rank",
-        help="Se attivo, inverte i valori delle colonne di 'rank', così che un valore più alto corrisponda ad una posizione migliore.",
-        on_change=reset_app_state_on_toggle
-    )
     
     # File Uploader
     col_uploader, col_empty1, col_system_data, col_empty_uploader = st.columns([2, 1, 3, 3])
@@ -623,7 +493,10 @@ with tab_esplorazione:
         st.subheader("⬆️Carica il tuo file") # Nuovo sottotitolo per chiarezza
         st.markdown("Carica il tuo file Excel **(.xlsx)**")
 
-        uploaded_file = st.file_uploader("Carica file Excel", type="xlsx", label_visibility="collapsed")
+        uploaded_file = st.file_uploader(
+            "", 
+            type="xlsx"
+        )
         df = st.session_state['df']
         sheet_name = None
         
@@ -639,14 +512,12 @@ with tab_esplorazione:
                     index=default_index,
                     key='sheet_select'
                 )
-
-                invert_rank = st.session_state["invert_rank"]
                     
                 # Bottone di caricamento
                 if st.button("Upload del file"):
                     # Carica i dati e salva il DF pulito in session_state['df']
                     with st.spinner(f"Caricamento dati dal foglio '{sheet_name}'..."):
-                        df_temp = load_data_from_upload(uploaded_file, sheet_name, invert_rank=st.session_state["invert_rank"])
+                        df_temp = load_data_from_upload(uploaded_file, sheet_name)
                         if df_temp is not None:
                             st.session_state['df'] = df_temp
                             st.session_state['perimeter'] = ''
@@ -674,7 +545,7 @@ with tab_esplorazione:
                 example_file_path = "./data/FT Master in Management 2025.xlsx"
                 with open(example_file_path, "rb") as f:
                     example_data = f.read()
-                st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "MIM 2025 (R)", invert_rank=st.session_state["invert_rank"])
+                st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "MIM 2025 (R)")
                 st.session_state['perimeter'] = 'Master in Management'
                 # Resetta i risultati del modello precedente
                 st.session_state['shap_df'] = None
@@ -685,7 +556,7 @@ with tab_esplorazione:
                 example_file_path = "./data/FT Masters in Finance 2025.xlsx"
                 with open(example_file_path, "rb") as f:
                     example_data = f.read()
-                st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "CF25 (R)", invert_rank=st.session_state["invert_rank"])
+                st.session_state['df'] = load_data_from_upload(BytesIO(example_data), "CF25 (R)")
                 st.session_state['perimeter'] = 'Master in Finance'
                 # Resetta i risultati del modello precedente
                 st.session_state['shap_df'] = None
@@ -700,10 +571,7 @@ with tab_esplorazione:
         st.header(f"Tabella di input {st.session_state['perimeter']}")
         
         # Visualizzazione Tabella Completa
-        invert_rank_state = st.session_state.get('invert_rank', True)
-        best_rule = "massimo" if invert_rank_state else "minimo"
-        best_value = df['Rank'].max() if invert_rank_state else df['Rank'].min()
-        st.markdown(f"Dati caricati e pre-processati (Rank: {best_value:.0f} = Rank #1 - Valore {best_rule}) usato per la posizione migliore.")
+        st.markdown(f"Dati caricati e pre-processati (Rank: {df['Rank'].max():.0f} = Rank #1).")
         st.markdown(f"*N. di osservazioni:* `{len(df)}` | *N. variabili:* `{len(df.columns)}`")
         st.dataframe(df, use_container_width=True, hide_index=True)
         popover = st.popover("💡 Data dictionary")
@@ -865,7 +733,7 @@ with tab_modello:
             with col_model:
                 st.subheader("Performance del Modello XGBoost")
                 st.markdown(f"""
-                Il modello è stato addestrato per prevedere il **Rank**).
+                Il modello è stato addestrato per prevedere il **Rank** (dove {df['Rank'].max():.0f} è il rank #1).
                 * **R²:** `{final_results['R2']:.4f}`
                 * **RMSE:** `{final_results['RMSE']:.4f}`
                 * **R² medio (Cross-Validation):** `{cv_results['R2_mean']:.4f} (+/- {cv_results['R2_std']:.4f})`
@@ -1164,8 +1032,6 @@ with tab_relazioni:
         X = shap_data['X']
         numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c not in ['Rank', 'School name']]
 
-        var_type = build_var_type_map(df)
-
         col_scelta_corr, col_popover_corr, col_empty = st.columns([2, 2, 6])
         with col_scelta_corr:
             radio_option = st.radio(
@@ -1275,22 +1141,8 @@ with tab_relazioni:
                 )
 
                 # Aggiungi i nodi dal grafo NetworkX
-                NODE_COLORS = {
-                    "Alumni survey": "#87D8F7",  # celeste
-                    "School survey": "#0b3d91",  # blu scuro
-                    "Unknown": "#81848b",        # grigio
-                }
-
-                # for node in G_corr.nodes:
-                #     net_corr.add_node(node, label=node, title=f"{node}", color="#41a4ff")
                 for node in G_corr.nodes:
-                    group = var_type.get(node, "Unknown")
-                    net_corr.add_node(
-                        node,
-                        label=node,  # mostra nome colonna originale
-                        title=f"{node}<br>Gruppo: {group}",
-                        color=NODE_COLORS.get(group, "#bfc7d5")
-    )
+                    net_corr.add_node(node, label=node, title=f"{node}", color="#41a4ff")
 
                 # Aggiungi archi con tooltip che mostra il peso
                 for u, v, data in G_corr.edges(data=True):
@@ -1312,7 +1164,7 @@ with tab_relazioni:
                         # Questo caso è teoricamente impossibile se la logica di NetworkX è corretta
                         edge_width = min_width
 
-                    color = "#F1B17C" if weight >= 0 else "#87D8F7"
+                    color = "#BDC8D9" if weight >= 0 else "#ef8585"
 
                     net_corr.add_edge(u, v, value=abs_weight, title=f"Correlazione: {weight:.3f}", color=color, width=edge_width)
 
@@ -1337,20 +1189,7 @@ with tab_relazioni:
                 </body>
                 """
             )
-            st.markdown(
-                """
-                <br>
-                <span style="color:#8fd3ff">●</span> Alumni survey &nbsp; 
-                <span style="color:#0b3d91">●</span> School survey &nbsp; 
-                <span style="display:inline-block; width:34px; border-top:6px solid #F1B17C; vertical-align:middle;"></span>
-                Correlazione positiva &nbsp;
-                <span style="display:inline-block; width:34px; border-top:6px solid #87D8F7; vertical-align:middle;"></span>
-                Correlazione negativa
-                """,
-                unsafe_allow_html=True
-            )
             components.html(html_content, height=750, scrolling=True)
-            
 
 
         st.markdown("---")
@@ -1479,22 +1318,8 @@ with tab_relazioni:
             )
 
             # Aggiungi i nodi dal grafo NetworkX
-            # for node in G_mi.nodes:
-            #     net_mi.add_node(node, label=node, title=f"{node}", color="#41a4ff")
-            NODE_COLORS = {
-                "Alumni survey": "#87D8F7",  # celeste
-                "School survey": "#0b3d91",  # blu scuro
-                "Unknown": "#81848b",        # grigio
-            }
-
             for node in G_mi.nodes:
-                group = var_type.get(node, "Unknown")
-                net_mi.add_node(
-                    node,
-                    label=node,
-                    title=f"{node}<br>Gruppo: {group}",
-                    color=NODE_COLORS.get(group, "#bfc7d5")
-                )
+                net_mi.add_node(node, label=node, title=f"{node}", color="#41a4ff")
 
             # Aggiungi archi con tooltip che mostra il peso
             for u, v, data in G_mi.edges(data=True):
@@ -1523,14 +1348,6 @@ with tab_relazioni:
                 </script>
                 </body>
                 """
-            )
-            st.markdown(
-                """
-                <br>
-                <span style="color:#8fd3ff">●</span> Alumni survey &nbsp; 
-                <span style="color:#0b3d91">●</span> School survey &nbsp; 
-                """,
-                unsafe_allow_html=True
             )
             components.html(html_content_mi, height=750, scrolling=True)
 
@@ -1641,14 +1458,14 @@ with tab_scenario:
                         
                     with col_slider:
                         st.slider(
-                            label=feature, #"",
+                            label="",
                             min_value=float(min_val),
                             max_value=float(max_val),
                             value=current_val, # Usa il valore correttamente inizializzato
                             step=float(step),
                             key=f"slider_{feature}",
                             help=f"Valore originale: {original_val}",
-                            label_visibility="collapsed" #"visible"
+                            label_visibility="visible"
                         )
                     
             # Gestione submit (fuori dal with st.form)
@@ -1684,6 +1501,7 @@ with tab_scenario:
                 <div style="background-color:#f0f2f6; padding:20px; border-radius:10px; margin-bottom:15px;">
                     <h4 style="margin:0; color:#555;">Punteggio Originale</h4>
                     <h2 style="margin:10px 0; color:#333;">{uni_score_original:.2f}</h2>
+                    <p style="margin:0; color:#666;">Rank #{ft_rank_original}</p>
                 </div>
             """, unsafe_allow_html=True)
             
@@ -1695,27 +1513,18 @@ with tab_scenario:
                 score_diff = st.session_state['scenario_result']['score_diff']
                 rank_diff = st.session_state['scenario_result']['rank_diff']
                 
-                invert_rank = st.session_state.get("invert_rank", True)
-
                 if abs(score_diff) < 0.5:
-                    box_color, border_color, icon, status = "#e8f4f8", "#b0c4de", "➡️", ""
-                elif score_diff > 0 and invert_rank==True:
-                    box_color, border_color, icon, status = "#d4f8d4", "#8cd98c", "📈", ""
-                elif score_diff < 0 and invert_rank==True:
-                    box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
-
-                elif score_diff < 0 and invert_rank==False:
-                    box_color, border_color, icon, status = "#d4f8d4", "#8cd98c", "📈", ""
-                elif score_diff > 0 and invert_rank==False:
-                    box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
-
-                # else:
-                #     box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
+                    box_color, border_color, icon, status = "#e8f4f8", "#b0c4de", "➡️", "Nessun cambiamento significativo"
+                elif score_diff > 0:
+                    box_color, border_color, icon, status = "#d4f8d4", "#8cd98c", "📈", "Miglioramento"
+                else:
+                    box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", "Peggioramento"
                     
                 st.markdown(f"""
                     <div style="background-color:{box_color}; padding:20px; border-radius:10px; border:2px solid {border_color}; margin-bottom:15px;">
                         <h4 style="margin:0; color:#555;">{icon} Punteggio Previsto</h4>
                         <h2 style="margin:10px 0; color:#333;">{predicted_score:.2f}</h2>
+                        <p style="margin:0; color:#666;">Rank #{predicted_rank}</p>
                     </div>
                 """, unsafe_allow_html=True)
                 
