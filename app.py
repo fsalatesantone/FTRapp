@@ -71,8 +71,8 @@ st.markdown("""
             </style>
 """, unsafe_allow_html=True)
 
-st.title("Analisi del Ranking FT")
-st.markdown("*Applicazione per l'analisi dei fattori che influenzano il ranking del Financial Times, utilizzando un modello XGBoost e l'interpretabilità SHAP.*")
+st.title("Financial Times Ranking Analysis")
+st.markdown("*App to analyze the factors that influence the Financial Times ranking, using an XGBoost model and SHAP explainability*")
 
 
 # --- Funzioni Utilità per Caricamento Dati ---
@@ -600,30 +600,30 @@ def to_excel_download(df_input, df_importance, df_shap):
 
 
 # --- Struttura dell'App Streamlit (Tabs) ---
-tab_esplorazione, tab_modello, tab_drilldown, tab_relazioni, tab_scenario = st.tabs(["Caricamento & Esplorazione Dati", "Analisi Globale Modello (SHAP)", "Drill-Down per Università", "Relazioni tra variabili", "Scenario Analysis"])
+tab_esplorazione, tab_modello, tab_drilldown, tab_relazioni, tab_scenario = st.tabs(["Data Upload & Exploration", "Global Model Analysis (SHAP)", "University Drill-Down", "Variable Relationships", "Scenario Analysis"])
 
 
 # -----------------------------------------------------
 # TAB 1: Caricamento & Esplorazione Dati
 # -----------------------------------------------------
 with tab_esplorazione:
-    st.header("Caricamento Dati di Input")
+    st.header("Input Data Upload")
 
     invert_rank = st.toggle(
-        "Inverti Rank (valore alto = posizione migliore)",
+        "Invert Rank (higher = better position)",
         value=True, 
         key="invert_rank",
-        help="Se attivo, inverte i valori delle colonne di 'rank', così che un valore più alto corrisponda ad una posizione migliore.",
+        help="If enabled, reverses the values of the 'rank' columns, so that a higher value corresponds to a better position.",
         on_change=reset_app_state_on_toggle
     )
     
     # File Uploader
     col_uploader, col_empty1, col_system_data, col_empty_uploader = st.columns([2, 1, 3, 3])
     with col_uploader:
-        st.subheader("⬆️Carica il tuo file") # Nuovo sottotitolo per chiarezza
-        st.markdown("Carica il tuo file Excel **(.xlsx)**")
+        st.subheader("⬆️Upload your file") # Nuovo sottotitolo per chiarezza
+        st.markdown("Upload your Excel file **(.xlsx)**")
 
-        uploaded_file = st.file_uploader("Carica file Excel", type="xlsx", label_visibility="collapsed")
+        uploaded_file = st.file_uploader("Upload Excel file", type="xlsx", label_visibility="collapsed")
         df = st.session_state['df']
         sheet_name = None
         
@@ -634,7 +634,7 @@ with tab_esplorazione:
             if sheet_names:
                 default_index = next((i for i, name in enumerate(sheet_names) if '(R)' in name), 0)
                 sheet_name = st.selectbox(
-                    "Seleziona il foglio di lavoro da caricare:",
+                    "Select the worksheet to load:",
                     sheet_names,
                     index=default_index,
                     key='sheet_select'
@@ -643,9 +643,9 @@ with tab_esplorazione:
                 invert_rank = st.session_state["invert_rank"]
                     
                 # Bottone di caricamento
-                if st.button("Upload del file"):
+                if st.button("Upload your file"):
                     # Carica i dati e salva il DF pulito in session_state['df']
-                    with st.spinner(f"Caricamento dati dal foglio '{sheet_name}'..."):
+                    with st.spinner(f"Uploading data from sheet '{sheet_name}'..."):
                         df_temp = load_data_from_upload(uploaded_file, sheet_name, invert_rank=st.session_state["invert_rank"])
                         if df_temp is not None:
                             st.session_state['df'] = df_temp
@@ -656,21 +656,21 @@ with tab_esplorazione:
                             st.session_state['shap_data'] = None
                             #st.success("Dati caricati e pronti per l'analisi.")
                         else:
-                            st.error("Caricamento fallito. Controlla il formato del file.")
+                            st.error("Upload failed. Please check the file format.")
                             st.session_state['df'] = None
                     
                     # Forzare un rerun per aggiornare la visualizzazione
                     st.rerun()
 
     with col_system_data:
-        st.subheader("🔄 Carica dati predefiniti")
-        st.markdown("Seleziona un set di dati")
+        st.subheader("🔄 Load preset data")
+        st.markdown("Select a dataset")
         st.markdown("")
         st.markdown("")
         
         col_mim, col_mif = st.columns(2)
         with col_mim:
-            if st.button("Dati predefiniti MIM 💼", use_container_width=True):
+            if st.button("Preset dataset: MIM 💼", use_container_width=True):
                 example_file_path = "./data/FT Master in Management 2025.xlsx"
                 with open(example_file_path, "rb") as f:
                     example_data = f.read()
@@ -681,7 +681,7 @@ with tab_esplorazione:
                 st.session_state['model_results'] = None
                 st.session_state['shap_data'] = None
         with col_mif:
-            if st.button("Dati predefiniti MIF 💰", use_container_width=True):
+            if st.button("Preset dataset: MIF 💰", use_container_width=True):
                 example_file_path = "./data/FT Masters in Finance 2025.xlsx"
                 with open(example_file_path, "rb") as f:
                     example_data = f.read()
@@ -694,44 +694,44 @@ with tab_esplorazione:
 
     # Contenuto Esplorazione (Mostrato solo se i dati sono stati caricati)
     if st.session_state['df'] is not None:
-        st.success("Dati caricati con successo.")
+        st.success("Upload successful.")
         st.markdown("---")
         df = st.session_state['df']
-        st.header(f"Tabella di input {st.session_state['perimeter']}")
-        
+        st.header(f"Input table {st.session_state['perimeter']}")
+
         # Visualizzazione Tabella Completa
         invert_rank_state = st.session_state.get('invert_rank', True)
-        best_rule = "massimo" if invert_rank_state else "minimo"
+        best_rule = "maximum" if invert_rank_state else "minimum"
         best_value = df['Rank'].max() if invert_rank_state else df['Rank'].min()
-        st.markdown(f"Dati caricati e pre-processati (Rank: {best_value:.0f} = Rank #1 - Valore {best_rule}) usato per la posizione migliore.")
-        st.markdown(f"*N. di osservazioni:* `{len(df)}` | *N. variabili:* `{len(df.columns)}`")
+        st.markdown(f"Data uploaded and pre-processed (Rank: {best_value:.0f} = Rank #1) - {best_rule} value used for the best position.")
+        st.markdown(f"*N. of observations:* `{len(df)}` | *N. of variables:* `{len(df.columns)}`")
         st.dataframe(df, use_container_width=True, hide_index=True)
         popover = st.popover("💡 Data dictionary")
         with popover:
-            st.caption("Legenda:")
+            st.caption("Legend:")
             st.markdown("""
-            * **School name**: Nome dell'università.
-            * **Location**: Nazione.
-            * **Rank**: Posizione nel ranking del Financial Times (100 = rank #1).
-            * **Weighted salary (US$)**: Salario medio ponderato in USD (tre anni dopo il completamento del Master) per i laureati. I salari sono convertiti in dollari USA usando il purchasing power parity (PPP) per tener conto delle differenze dei costi di vita tra paesi. Inoltre, vengono applicate ponderazioni per ridurre la distorsione di salari estremi (alto o basso).
-            * **Salary percentage increase**: Percentuale media di aumento salariale tra il salario iniziale (subito dopo il completamento del master) e il salario attuale (a tre anni). Spesso metà del peso è sull'aumento assoluto e metà sulla percentuale relativa.
-            * **Value for money rank**: Classifica (rank) che misura il "rapporto qualità/prezzo" del programma, tenendo in considerazione il salario atteso, la durata del corso, le tasse e i costi opportunità (es. reddito perso durante il corso).
-            * **Career progress rank**: Classifica basata sul progresso di carriera degli alumni: cambi di seniority, dimensione dell'organizzazione in cui lavorano ora rispetto a prima del master, aumento di responsabilità, e mobilità nei ruoli.
-            * **Aims achieved (%)**: Percentuale di alumni che riportano di aver raggiunto gli obiettivi professionali / personali dichiarati all'inizio del master (ovvero quanto il corso ha soddisfatto le aspettative).
-            * **Careers service rank**: Classifica del servizio carriera della business school (ufficio placement, supporto, network, opportunità offerte) così come percepito dagli alumni / dati forniti.
-            * **Alumni network rank**: Classifica della forza / efficacia della rete alumni (networking, collegamenti, supporto, opportunità grazie agli alumni).
-            * **Employed at three months (%)**: Percentuale di alumni impiegati (in un lavoro rilevante) entro 3 mesi dal completamento del master.
-            * **Female faculty (%)**: Percentuale di docenti (facoltà) di genere femminile nella scuola / nel programma.
-            * **Female students (%)**: Percentuale di studenti di genere femminile nel programma del master.
-            * **Women on board (%)**: Percentuale di membri femminili nel consiglio di amministrazione (board) della business school.
-            * **International faculty (%)**: Percentuale di docenti con cittadinanza non locale / internazionale (cioè provenienti da paesi diversi).
-            * **International students (%)**: Percentuale di studenti con cittadinanza internazionale (non del paese sede) nel programma.
-            * **International board (%)**: Percentuale di membri del board della scuola con cittadinanza internazionale (non del paese sede).
-            * **International work mobility rank**: Classifica della mobilità internazionale del lavoro: misura quanti alumni si spostano in un paese diverso da quello d'origine per lavoro dopo il master (cambi di paese di impiego).
-            * **International course experience rank**: Classifica dell'esperienza internazionale del corso: quanto la componente internazionale è presente nei contenuti, esperienze, scambi, mobilità nel corso, progetti internazionali.
-            * **Faculty with doctorates (%)**: Percentuale di docenti che possiedono un dottorato (PhD) o titolo equivalente.
-            * **ESG and net zero teaching rank**: Classifica legata alla sostenibilità ed ESG (Environmental, Social, Governance), specialmente per l'impegno della scuola verso obiettivi "net zero" o di neutralità carbonica / pratiche green integrate.
-            * **Carbon footprint rank**: Classifica basata sull'impronta di carbonio della scuola (emissioni dirette e indirette). Misura quanto la scuola è "virtuosa" dal punto di vista ambientale.
+            * **School name**: Name of the university.
+            * **Location**: Country.
+            * **Rank**: Position in the Financial Times ranking (100 = rank #1).
+            * **Weighted salary (US$)**: Average weighted salary in USD (three years after completing the Master's) for graduates. Salaries are converted to US dollars using purchasing power parity (PPP) to account for differences in living costs between countries. In addition, weighting is applied to reduce distortion from extreme salaries (high or low).
+            * **Salary percentage increase**: Average percentage increase in salary between the initial salary (immediately after completing the Master's) and the current salary (three years later). Often half the weight is on the absolute increase and half on the relative percentage.
+            * **Value for money rank**: Ranking that measures the "value for money" of the program, taking into account expected salary, course duration, fees, and opportunity costs (e.g., income lost during the course).
+            * **Career progress rank**: Ranking based on the career progression of alumni: changes in seniority, size of the organization they work for now compared to before the Master's, increase in responsibilities, and mobility in roles.
+            * **Aims achieved (%)**: Percentage of alumni who report having achieved the professional/personal goals stated at the beginning of the Master's (i.e., how well the course met expectations).
+            * **Careers service rank**: Ranking of the business school's career service (placement office, support, network, opportunities offered) as perceived by alumni/data provided.
+            * **Alumni network rank**: Ranking of the strength/effectiveness of the alumni network (networking, connections, support, opportunities provided by alumni).
+            * **Employed at three months (%)**: Percentage of alumni employed (in a relevant job) within 3 months of completing the Master's.
+            * **Female faculty (%)**: Percentage of female faculty members in the school/program.
+            * **Female students (%)**: Percentage of female students in the Master's program.
+            * **Women on board (%)**: Percentage of female members on the board of the business school.
+            * **International faculty (%)**: Percentage of faculty members with non-local/international citizenship (i.e., from different countries).
+            * **International students (%)**: Percentage of students with international citizenship (not from the host country) in the program.
+            * **International board (%)**: Percentage of board members of the school with international citizenship (not from the host country).
+            * **International work mobility rank**: Ranking of international work mobility: measures how many alumni move to a country different from their home country for work after the Master's (changes in employment country).
+            * **International course experience rank**: Ranking of international course experience: how much the international component is present in the content, experiences, exchanges, mobility in the course, international projects.
+            * **Faculty with doctorates (%)**: Percentage of faculty members who hold a doctorate (PhD) or equivalent.
+            * **ESG and net zero teaching rank**: Ranking related to sustainability and ESG (Environmental, Social, Governance), especially for the school's commitment to "net zero" or carbon neutrality goals/green integrated practices.
+            * **Carbon footprint rank**: Ranking based on the school's carbon footprint (direct and indirect emissions). Measures how "virtuous" the school is from an environmental perspective.
             """)
         st.markdown("---")
         
@@ -743,7 +743,7 @@ with tab_esplorazione:
             default_unis = [luiss_name] if luiss_name in df['School name'].unique() else df['School name'].unique()[:1].tolist()
 
             selected_unis = st.multiselect(
-                "Seleziona Università da evidenziare nei grafici:",
+                "Select Universities to be highlighted in the charts:",
                 sorted(df['School name'].unique()),
                 default=default_unis,
                 key='exp_highlight_unis'
@@ -754,26 +754,26 @@ with tab_esplorazione:
 
         with col_rank_chart:
             # Grafico di Classifica Generale (Rank)
-            st.subheader("Classifica Generale")
+            st.subheader("General Ranking")
             st.markdown("")
             
             fig_rank = plot_ranked_variable(
                 df,
                 'Rank',
                 selected_unis,
-                "Classifica per Rank"
+                "Ranking by Rank"
             )
             st.plotly_chart(fig_rank, use_container_width=True)
         
         with col_var_chart:
             # Grafico di Classifica per Variabile Selezionata
-            st.subheader("Classifica per Variabile")
-            
+            st.subheader("Ranking by Selected Variable")
+
             # Filtra le colonne numeriche disponibili per i plot
             numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'Rank' and c != 'School name']
             
             selected_variable = st.selectbox(
-                "Seleziona la variabile per definire la classifica:",
+                "Select the variable to define the ranking:",
                 numeric_cols,
                 index=numeric_cols.index('Weighted salary (US$)') if 'Weighted salary (US$)' in numeric_cols else 0,
                 key='exp_variable_select'
@@ -783,7 +783,7 @@ with tab_esplorazione:
                 df,
                 selected_variable,
                 selected_unis,
-                f"Classifica per: '{selected_variable}'"
+                f"Ranking by: '{selected_variable}'"
             )
             st.plotly_chart(fig_var, use_container_width=True)
 
@@ -792,26 +792,26 @@ with tab_esplorazione:
 # TAB 2: Analisi Globale Modello (SHAP)
 # -----------------------------------------------------
 with tab_modello:
-    
-    st.header("Modello di Machine Learning e Calcolo SHAP")
-    
+
+    st.header("Machine Learning Model and SHAP Calculation")
+
     if st.session_state['df'] is None:
-        st.warning("Per addestrare il modello, carica prima i dati nel Tab 'Caricamento & Esplorazione Dati'.")
+        st.warning("To train the model, please upload the data in the 'Data Upload & Exploration' tab first.")
     else:
         # Bottone per addestrare il modello
         col_bottone1, col_empty, col_download = st.columns([1, 2, 1])
         with col_bottone1:
             if uploaded_file is not None:
-                if st.button("🚀 Avvia addestramento del modello"):
-                    with st.spinner("Addestramento in corso... (potrebbe richiedere qualche minuto)"):
-                        train_and_shap(st.session_state['df'].copy()) # Passa una copia per evitare side effects
-                    # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
-            # Se non è stato caricato il file manualemente, mostra il bottone di training
+                if st.button("🚀 Start Model Training"):
+                    with st.spinner("Training in progress... (this may take a few minutes)"):
+                        train_and_shap(st.session_state['df'].copy()) # Pass a copy to avoid side effects
+                    # The app will refresh and display the results thanks to the next if
+            # If the file has not been uploaded manually, show the training button
             elif uploaded_file is None:
-                if st.button("♻️ Carica il modello pre-addestrato"):
-                    with st.spinner("Caricamento del modello..."):
-                        pretrain_and_shap(st.session_state['df'].copy(), st.session_state['perimeter']) # Passa una copia per evitare side effects
-                    # L'app si riaggiornerà e visualizzerà i risultati grazie all'if successivo
+                if st.button("♻️ Load Pre-trained Model"):
+                    with st.spinner("Loading model..."):
+                        pretrain_and_shap(st.session_state['df'].copy(), st.session_state['perimeter']) # Pass a copy to avoid side effects
+                    # The app will refresh and display the results thanks to the next if
 
         with col_download:
             if st.session_state['shap_df'] is not None:
@@ -824,9 +824,9 @@ with tab_modello:
                 excel_data = to_excel_download(df_input, df_importance, shap_df)
 
 
-                st.info("📊 Scarica il file Excel con i risultati 👇")
+                st.info("📊 Download the Excel file with the results 👇")
                 st.download_button(
-                    label="⬇️ Scarica file (.xlsx)",
+                    label="⬇️ Download file (.xlsx)",
                     data=excel_data,
                     file_name="analisi_ranking_ft.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -851,43 +851,43 @@ with tab_modello:
             feature_cols_with_ranking = feature_cols + ['Rank']
             
             st.markdown("---")
-            st.header("Stima del Modello")
+            st.header("Model Estimation")
 
             # --- Contenitore 1: Riepilogo Dati e Performance ---
             col_data, col_model = st.columns(2)
             
             with col_data:
-                st.subheader("Riepilogo dati di input utilizzati")
-                st.markdown(f"* **Numero di Università:** `{len(df)}`")
-                st.markdown(f"* **Numero di Feature:** `{len(feature_cols)}`")
+                st.subheader("Input Data Summary")
+                st.markdown(f"* **Number of Universities:** `{len(df)}`")
+                st.markdown(f"* **Number of Features:** `{len(feature_cols)}`")
                 st.dataframe(df[feature_cols].describe().T.style.format('{:.2f}'), use_container_width=True)
             
             with col_model:
-                st.subheader("Performance del Modello XGBoost")
+                st.subheader("XGBoost Model Performance")
                 st.markdown(f"""
-                Il modello è stato addestrato per prevedere il **Rank**).
+                The model was trained to predict the **Rank**.
                 * **R²:** `{final_results['R2']:.4f}`
                 * **RMSE:** `{final_results['RMSE']:.4f}`
-                * **R² medio (Cross-Validation):** `{cv_results['R2_mean']:.4f} (+/- {cv_results['R2_std']:.4f})`
-                * **RMSE medio (Cross-Validation):** `{cv_results['RMSE_mean']:.4f} (+/- {cv_results['RMSE_std']:.4f})`
+                * **Mean R² (Cross-Validation):** `{cv_results['R2_mean']:.4f} (+/- {cv_results['R2_std']:.4f})`
+                * **Mean RMSE (Cross-Validation):** `{cv_results['RMSE_mean']:.4f} (+/- {cv_results['RMSE_std']:.4f})`
                 """)
-                st.info("Nota: L'alto R² suggerisce un ottimo *fit* per l'analisi SHAP interpretativa.")
+                st.info("Note: The high R² suggests a good fit for the SHAP interpretability analysis.")
 
             # --- Contenitore 2: Grafici di Importanza e Distribuzione SHAP ---
             st.markdown("---")
-            st.header("SHAP Analysis - Interpretabilità del Modello")
+            st.header("SHAP Analysis - Model Interpretability")
             col_bar, col_beeswarm = st.columns(2)
 
             with col_bar:
                 st.subheader("Feature Importance")
-                st.caption("Mostra le feature ordinate in modo descrescente per importanza media assoluta nel determinare il Rank.")
+                st.caption("Shows the features ranked in descending order of their mean absolute importance in determining the Rank.")
                 # Grafico a barre con Plotly
                 st.plotly_chart(plot_shap_summary_bar(shap_values, feature_cols), use_container_width=True)
 
             with col_beeswarm:
-                st.subheader("SHAP Beeswarm Plot - Distribuzione degli Effetti")
-                st.caption("Ogni punto è un'università. Il colore indica il valore della feature, la posizione orizzontale indica l'impatto sul Rank (valore SHAP).")
-                # Grafico Beeswarm (Matplotlib, usa la cache)
+                st.subheader("SHAP Beeswarm Plot - Distribution of Effects")
+                st.caption("Each point represents a university. The color indicates the feature value, and the horizontal position indicates the impact on the Rank (SHAP value).")
+                # Beeswarm plot (Matplotlib, uses cache)
                 st.pyplot(plot_shap_beeswarm(shap_values, X, feature_cols), use_container_width=True)
 
             # --- Contenitore 3: Dependence Plots (Focus sulle interazioni) ---
@@ -898,31 +898,31 @@ with tab_modello:
             
             with col_slider:
                 max_features = len(shap_values[0])
-                top_n_var = st.slider("Numero di feature da mostrare:", 1, max_features, min(9, max_features), step=1, key='mod_slider_features')
-                
-            st.subheader(f"SHAP Dependence Plots (Interazioni con il Rank) - Top {top_n_var} Features")
-            st.caption("Questi grafici mostrano l'effetto di una singola feature sul Rank, colorando i punti in base al Rank effettivo di quell'università.")
-            
-            # Trova gli indici delle top_n_var feature più importanti
+                top_n_var = st.slider("Number of features to display:", 1, max_features, min(9, max_features), step=1, key='mod_slider_features')
+
+            st.subheader(f"SHAP Dependence Plots (Interactions with Rank) - Top {top_n_var} Features")
+            st.caption("These plots show the effect of a single feature on the Rank, coloring the points based on the actual Rank of that university.")
+
+            # Find the indices of the top_n_var most important features
             feature_importance = np.abs(shap_values).mean(axis=0)
             top_features_idx = np.argsort(feature_importance)[-top_n_var:][::-1]
 
-            # Determina la disposizione dei subplot in base al numero di top_n_var
+            # Determine the layout of the subplots based on the number of top_n_var
             n_cols = 3
-            
-            # Crea le colonne per i dependence plots
+
+            # Create columns for the dependence plots
             all_cols = st.columns(n_cols)
-            
-            # Itera sui top N indici e genera i plot
+
+            # Iterate over the top N indices and generate the plots
             for i, feat_idx in enumerate(top_features_idx):
                 with all_cols[i % n_cols]:
                     fig = plot_shap_dependence(feat_idx, shap_values_extended, X_with_ranking, feature_cols_with_ranking)
                     st.pyplot(fig, use_container_width=True)
         else:
             if uploaded_file is None:
-                st.info("Clicca sul bottone per caricare il modello pre-addestrato e calcolare i valori SHAP.")
+                st.info("Click the button to upload the pre-trained model and compute the SHAP values.")
             else:
-                st.info("Clicca sul bottone per addestrare il modello e calcolare i valori SHAP.")
+                st.info("Click the button to train the model and compute the SHAP values.")
 
 
 # -----------------------------------------------------
@@ -931,11 +931,11 @@ with tab_modello:
 with tab_drilldown:
     
     if st.session_state['shap_df'] is None:
-        st.warning("Per l'analisi Drill-Down, devi prima addestrare il modello nel Tab 'Analisi Globale Modello (SHAP)'.")
+        st.warning("For the Drill-Down analysis, you must first train the model in the 'Global Model Analysis (SHAP)' Tab.")
     else:
-        # Estrai dati da session state
+        # Extract data from session state
         df = st.session_state['df']
-        # Usiamo una versione con indice resettato per allineare gli indici con X e shap_values
+        # Use a version with reset index to align indices with X and shap_values
         df_reset = df.reset_index(drop=True) 
         
         shap_df = st.session_state['shap_df']
@@ -955,42 +955,41 @@ with tab_drilldown:
             default_index = list(uni_names).index(luiss_name) if luiss_name in uni_names else 0
 
             selected_uni_name = st.selectbox(
-                "Seleziona Università:",
+                "Select University:",
                 uni_names,
                 index=default_index,
-                key='uni_drilldown_select' # Aggiunto key per Streamlit
+                key='uni_drilldown_select' # Added key for Streamlit
             )
-        
-        # Estrai i dati per l'università selezionata (per il Drill-Down iniziale)
-        # Nota: usiamo l'indice in df_reset per l'accesso a X e shap_values
-        uni_idx_in_X_shap = df_reset.query(f"`School name` == '{selected_uni_name}'").index[0] 
+
+        # Extract data for the selected university (for the initial Drill-Down)
+        # Note: we use the index in df_reset to access X and shap_values
+        uni_idx_in_X_shap = df_reset.query(f"`School name` == '{selected_uni_name}'").index[0]
         uni_score = df_reset.iloc[uni_idx_in_X_shap]['Rank']
         ft_rank = int(df_reset['Rank'].max() - uni_score + 1)
 
-        st.header(f"**{selected_uni_name}** - Rank #{ft_rank} (Score: {uni_score:.0f})")
+        st.header(f"**{selected_uni_name}** - Score: {uni_score:.0f} (Rank #{ft_rank})")
 
-        # ... (Il resto del codice Force Plot e Waterfall Plot del Drill-Down iniziale rimane invariato) ...
         col_waterfall, col_force = st.columns([2, 4])
         with col_waterfall:
             st.subheader(f"Waterfall Plot")
-            st.caption("Mostra come i valori di ogni feature spingono la previsione del modello dalla media (`Base Value`) al punteggio previsto (`f(x)`).")
-            # Grafico Waterfall
+            st.caption("Shows how the values of each feature push the model's prediction from the average (`Base Value`) to the predicted score (`f(x)`).")
+            # Waterfall Plot
             fig_waterfall = plot_shap_waterfall(uni_idx_in_X_shap, explainer, shap_values, X, df_reset, feature_cols)
             st.pyplot(fig_waterfall, use_container_width=True)
 
         with col_force:
             # --- BLOCCO 1: Force Plot (Grafico) ---
             st.subheader("Force Plot")
-            st.caption("Le feature in **rosso** aumentano il punteggio previsto (`f(x)`), quelle in **blu** lo diminuiscono.")
-            
-            # Grafico Force Plot (HTML per interattività)
+            st.caption("The features in **red** increase the predicted score (`f(x)`), while those in **blue** decrease it.")
+
+            # Force Plot (HTML for interactivity)
             shap_html_content = plot_shap_force(uni_idx_in_X_shap, explainer, shap_values, X, feature_cols)
-            st.components.v1.html(shap_html_content, height=350, scrolling=True) 
-            
-            # ... (Blocco 2: Feature Positive/Negative) ...
+            st.components.v1.html(shap_html_content, height=350, scrolling=True)
+
+            # ... (Block 2: Positive/Negative Features) ...
             st.markdown("---")
-            
-            # Calcola le feature positive e negative per la lista
+
+            # Calculate positive and negative features for the list
             pos_features = [(feature_cols[i], shap_values[uni_idx_in_X_shap][i]) for i in range(len(feature_cols)) if shap_values[uni_idx_in_X_shap][i] > 0]
             neg_features = [(feature_cols[i], shap_values[uni_idx_in_X_shap][i]) for i in range(len(feature_cols)) if shap_values[uni_idx_in_X_shap][i] < 0]
             
@@ -1000,7 +999,7 @@ with tab_drilldown:
             col_positivi, col_negativi = st.columns(2)
             
             with col_positivi:
-                st.markdown("**📈 Top 5 Feature che aumentano il punteggio previsto:**")
+                st.markdown("**📈 Top 5 features that increase the predicted score:**")
 
                 for feat, val in pos_features_sorted[:5]:
                     st.markdown(
@@ -1019,7 +1018,7 @@ with tab_drilldown:
                     )
 
             with col_negativi:
-                st.markdown("**📉 Top 5 Feature che diminuiscono il punteggio previsto:**")
+                st.markdown("**📉 Top 5 features that decrease the predicted score:**")
 
                 for feat, val in neg_features_sorted[:5]:
                     st.markdown(
@@ -1039,58 +1038,58 @@ with tab_drilldown:
         
         # --- Sezione Confronto Competitor ---
         st.markdown("---")
-        st.header("Analisi Competitor")
-        st.caption("Seleziona i competitor per visualizzare il loro *Waterfall Plot* e confrontare i valori delle loro feature con l'Università di riferimento.")
-        
-        # --- Controlli per i Competitor ---
+        st.header("Competitor Analysis")
+        st.caption("Select competitors to view their *Waterfall Plot* and compare their feature values with the reference University.")
+
+        # --- Controls for Competitors ---
         col_filter_loc, col_select_uni_comp, col_empty_sel = st.columns([1, 2, 3])
-        
-        # Opzione 1: Filtro per Area Geografica
-        locations = ['Tutte le aree geografiche'] + list(sorted(df['Location'].unique()))
+
+        # Option 1: Filter by Geographic Area
+        locations = ['All geographic areas'] + list(sorted(df['Location'].unique()))
         with col_filter_loc:
-            selected_location = st.selectbox("Filtra per Area Geografica:", locations, key='comp_location_filter')
-            
-        # Applica il filtro geografico prima della multiselezione
-        df_filtered = df[df['Location'] == selected_location] if selected_location != 'Tutte le aree geografiche' else df
-        
-        # Rimuovi l'università di riferimento dall'elenco dei competitor
+            selected_location = st.selectbox("Filter by Geographic Area:", locations, key='comp_location_filter')
+
+        # Apply geographic filter before multi-selection
+        df_filtered = df[df['Location'] == selected_location] if selected_location != 'All geographic areas' else df
+
+        # Remove the reference university from the list of competitors
         competitor_uni_names = sorted(df_filtered.query(f"`School name` != '{selected_uni_name}'")['School name'].unique())
         
         with col_select_uni_comp:
-            # Opzione 2: Multiselezione dei competitor
+            # Option 2: Multi-selection of competitors
             selected_competitors = st.multiselect(
-                "Seleziona uno o più competitor per il confronto:",
+                "Select one or more competitors for comparison:",
                 competitor_uni_names,
                 key='comp_multiselect'
             )
-            
-        # --- Report di Analisi Competitor e Plot ---
+
+        # --- Competitor Analysis Report and Plot ---
         if selected_competitors:
-            
-            # --- 1. Tabella di Confronto (Ordine Forzato) ---
-            st.subheader("Tabella di Confronto (Università di riferimento vs Competitor Selezionati)")
-            
-            # Lista ordinata delle università da confrontare
+
+            # --- 1. Comparison Table (Forced Order) ---
+            st.subheader("Comparison Table (Reference University vs Selected Competitors)")
+
+            # List of universities to compare
             uni_names_to_compare = [selected_uni_name] + selected_competitors
-            
-            # Filtra i dati per le università selezionate
+
+            # Filter data for selected universities
             df_comparison_temp = df[df['School name'].isin(uni_names_to_compare)].drop_duplicates(subset=['School name'])
-            
-            # Imposta l'indice a 'School name'
-            df_comparison = df_comparison_temp.set_index('School name', verify_integrity=True) 
-            
-            # Riordina le colonne in base alla lista ordinata uni_names_to_compare
+
+            # Set index to 'School name'
+            df_comparison = df_comparison_temp.set_index('School name', verify_integrity=True)
+
+            # Reorder columns based on the sorted list uni_names_to_compare
             df_comparison = df_comparison.reindex(uni_names_to_compare) # <--- CORREZIONE ORDINE TABELLA
-            
-            # Colonne iniziali fisse e feature
+
+            # Fixed initial columns and features
             initial_cols = ['Rank', 'Location']
             all_model_features = feature_cols
             unique_model_features = [col for col in all_model_features if col not in initial_cols]
             display_cols = initial_cols + unique_model_features
 
             df_comparison_fixed = df_comparison[display_cols].copy()
-            
-            # Applica formattazione (assicurati che le colonne esistano prima di formattare)
+
+            # Apply formatting (ensure columns exist before formatting)
             if 'Rank' in df_comparison_fixed.columns:
                  df_comparison_fixed['Rank'] = df_comparison_fixed['Rank'].apply(lambda x: f"{x:.0f}")
             if 'Weighted salary (US$)' in df_comparison_fixed.columns:
@@ -1105,36 +1104,36 @@ with tab_drilldown:
             df_display.columns.name = 'Feature'
 
             styled_table = df_display.style \
-                .set_caption(f"Confronto Dati Chiave ({selected_uni_name} vs. Competitor)") \
+                .set_caption(f"Comparison of Key Data ({selected_uni_name} vs. Competitors)") \
                 .set_properties(**{'border-color': 'lightgray'})
                 
             st.dataframe(styled_table, use_container_width=True)
             st.markdown("---")
-            
-            # --- 2. Waterfall Plot per ciascun Competitor (Ordine e Indicizzazione Corretti) ---
-            st.subheader("Waterfall Plot SHAP per Competitor")
-            st.caption("Ogni grafico mostra la decomposizione del Rank previsto. L'ordine dei grafici riflette l'ordine delle colonne nella tabella.")
-            
-            n_cols_waterfall = 4 
-            # Qui usiamo un numero fisso di 4 colonne, Streamlit gestirà il wrapping se ci sono meno di 4 plot.
+
+            # --- 2. Waterfall Plot for Each Competitor (Correct Order and Indexing) ---
+            st.subheader("Waterfall Plot SHAP for Competitors")
+            st.caption("Each plot shows the decomposition of the predicted Rank. The order of the plots reflects the order of the columns in the table.")
+
+            n_cols_waterfall = 4
+            # Here we use a fixed number of 4 columns, Streamlit will handle wrapping if there are fewer than 4 plots.
             waterfall_cols = st.columns(n_cols_waterfall)
-            
-            # Itera sulla lista ORDINATA (uni_names_to_compare)
+
+            # Iterate over the sorted list (uni_names_to_compare)
             for i, competitor_name in enumerate(uni_names_to_compare):
-                
-                # TROVA L'INDICE CORRETTO IN X/SHAP_VALUES usando df_reset
+
+                # Find the correct index in X/SHAP_VALUES using df_reset
                 try:
                     comp_idx_in_X_shap = df_reset.query(f"`School name` == '{competitor_name}'").index[0]
                 except IndexError:
-                    # Gestisce il caso (improbabile se i dati sono coerenti) in cui il nome non si trovi in df_reset
-                    st.error(f"Errore: L'università {competitor_name} non è stata trovata nel dataset di training pulito.")
+                    # Handle the case (unlikely if data is consistent) where the name is not found in df_reset
+                    st.error(f"Error: University {competitor_name} not found in the cleaned training dataset.")
                     continue
-                
-                # Usa solo le colonne disponibili (max 4)
+
+                # Use only available columns (max 4)
                 with waterfall_cols[i % n_cols_waterfall]:
                     comp_score = df_reset.iloc[comp_idx_in_X_shap]['Rank']
                     comp_rank = int(df_reset['Rank'].max() - comp_score + 1)
-                    st.markdown(f"**{competitor_name}** (Rank #{comp_rank}, Score: {comp_score:.0f})")
+                    st.markdown(f"**{competitor_name}** (Score: {comp_score:.0f}, Rank #{comp_rank})")
                     
                     # Usa comp_idx_in_X_shap per accedere a X e shap_values
                     # e df_reset per accedere alle info generali
@@ -1142,20 +1141,20 @@ with tab_drilldown:
                     st.pyplot(fig_comp_waterfall, use_container_width=True)
                     
         else:
-            st.info("Seleziona almeno un'università competitor per avviare l'analisi di confronto.")
+            st.info("Select at least one competitor university to start the comparison analysis.")
 
 with tab_relazioni:
     st.markdown("---")
-    st.markdown("## 📊 Analisi delle Correlazioni")
+    st.markdown("## 📊 Correlation Analysis")
 
     if st.session_state['shap_df'] is None:
-        st.warning("Per l'analisi Drill-Down, devi prima addestrare il modello nel Tab 'Analisi Globale Modello (SHAP)'.")
+        st.warning("To perform Drill-Down analysis, you must first train the model in the 'Global Model Analysis (SHAP)' tab.")
     else:
-        # Estrai dati da session state
+        # Extract data from session state
         df = st.session_state['df']
-        # Usiamo una versione con indice resettato per allineare gli indici con X e shap_values
-        df_reset = df.reset_index(drop=True) 
-        
+        # Use a version with reset index to align indices with X and shap_values
+        df_reset = df.reset_index(drop=True)
+
         shap_df = st.session_state['shap_df']
         feature_cols = st.session_state['model_results']['feature_cols']
         shap_data = st.session_state['shap_data']
@@ -1169,31 +1168,31 @@ with tab_relazioni:
         col_scelta_corr, col_popover_corr, col_empty = st.columns([2, 2, 6])
         with col_scelta_corr:
             radio_option = st.radio(
-                "Metodo di correlazione:",
+                "Correlation Method:",
                 ('Pearson', 'Spearman'),
                 index=0,
                 horizontal=True,
                 key='rel_corr_method'
             )
         with col_popover_corr:
-            popover_corr = st.popover("ℹ️ Info sui metodi di correlazione")
+            popover_corr = st.popover("ℹ️ Correlation Methods Info")
             with popover_corr:
-                st.caption("📘 Tipi di correlazione: Pearson e Spearman")
+                st.caption("📘 Correlation Types: Pearson and Spearman")
                 st.markdown("""
-                - **Correlazione di Pearson**: Misura la relazione lineare tra due variabili continue. 
-                  Assume che i dati siano normalmente distribuiti e sensibili ai valori anomali. 
-                  È adatta quando la relazione tra le variabili è lineare.
+                - **Pearson Correlation**: Measures the linear relationship between two continuous variables.
+                  It assumes the data are normally distributed and is sensitive to outliers. 
+                  It’s appropriate when the relationship between variables is linear.
 
-                - **Correlazione di Spearman**: Misura la relazione monotona tra due variabili, 
-                  basandosi sui ranghi anziché sui valori effettivi. 
-                  Non richiede l'assunzione di normalità ed è meno sensibile ai valori anomali. 
-                  È ideale per relazioni non lineari ma monotone.
+                - **Spearman Correlation**: Measures the monotonic relationship between two variables,
+                  based on ranks rather than actual values.
+                  It does not require the assumption of normality and is less sensitive to outliers.
+                  It is ideal for non-linear but monotonic relationships.
                 """)
 
         col_corr_matrice, col_empty1, col_corr_grafo = st.columns([4, 1, 4])            
 
         with col_corr_matrice:
-            st.markdown("### 🔗 Matrice delle correlazioni")
+            st.markdown("### 🔗 Correlation Matrix")
             method = 'spearman' if radio_option == 'Spearman' else 'pearson'
             corr_matrix = df[numeric_cols].corr(method=method)
 
@@ -1203,7 +1202,7 @@ with tab_relazioni:
             sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', ax=ax_corr)
             st.pyplot(fig_corr, use_container_width=True)
 
-            with st.expander("🔝 Top 10 correlazioni", expanded=False):
+            with st.expander("🔝 Top 10 correlations", expanded=False):
                 corr_pairs = (
                     corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
                     .stack()
@@ -1245,11 +1244,11 @@ with tab_relazioni:
                     )
 
         with col_corr_grafo:
-            st.markdown("### 🕸️ Grafo delle correlazioni")
+            st.markdown("### 🕸️ Correlation Graph")
 
             col_corr_slider, col_empty, col_corr_stat = st.columns([2, 1, 1])
             with col_corr_slider:
-                soglia_corr = st.slider("Soglia min. correlazione (|r|):", 0.0, 1.0, 0.5, 0.05, key='rel_corr_grafo_slider')
+                soglia_corr = st.slider("Threshold min. Correlation (|r|):", 0.0, 1.0, 0.5, 0.05, key='rel_corr_grafo_slider')
 
                 # Crea grafo
                 G_corr = nx.Graph()
@@ -1317,7 +1316,7 @@ with tab_relazioni:
                     net_corr.add_edge(u, v, value=abs_weight, title=f"Correlazione: {weight:.3f}", color=color, width=edge_width)
 
             with col_corr_stat:
-                st.caption(f"N. di archi: {corr_edges}")
+                st.caption(f"N. edges: {corr_edges}")
 
 
             net_corr.force_atlas_2based()
@@ -1343,9 +1342,9 @@ with tab_relazioni:
                 <span style="color:#8fd3ff">●</span> Alumni survey &nbsp; 
                 <span style="color:#0b3d91">●</span> School survey &nbsp; 
                 <span style="display:inline-block; width:34px; border-top:6px solid #F1B17C; vertical-align:middle;"></span>
-                Correlazione positiva &nbsp;
+                Positive Correlation &nbsp;
                 <span style="display:inline-block; width:34px; border-top:6px solid #87D8F7; vertical-align:middle;"></span>
-                Correlazione negativa
+                Negative Correlation
                 """,
                 unsafe_allow_html=True
             )
@@ -1354,29 +1353,29 @@ with tab_relazioni:
 
 
         st.markdown("---")
-        st.markdown("## 💡 Analisi delle Relazioni tramite Mutual Information")
+        st.markdown("## 💡 Analysis of Relationships through Mutual Information")
 
-        popover_mi = st.popover("ℹ️ Info sulla Mutual Information")
+        popover_mi = st.popover("ℹ️ Mutual Information Info")
         with popover_mi:
-            st.caption("📘 Cos'è la Mutual Information (MI)")
+            st.caption("📘 What is Mutual Information (MI)?")
             st.markdown("""
-            La **Mutual Information (MI)** misura la **dipendenza statistica** tra due variabili, 
-            valutando quanta **informazione condividono**.  
-            A differenza della **correlazione**, la MI cattura anche **relazioni non lineari** 
-            e non si limita a relazioni monotone.
+            **Mutual Information (MI)** measures the **statistical dependence** between two variables, 
+            assessing how much **information they share**.  
+            Unlike **correlation**, MI also captures **non-linear relationships** 
+            and is not limited to monotonic relationships.
 
-            **Vantaggi principali:**
-            - Rileva dipendenze anche non lineari 📈  
-            - È simmetrica: MI(A, B) = MI(B, A) 🔁  
-            - Non richiede assunzioni di distribuzione ⚙️
-                        
-            Il **grafico** mostra la quantità media di informazione condivisa tra le feature del dataset.
-                        """)
+            **Main Advantages:**
+            - Detects non-linear dependencies 📈  
+            - Is symmetric: MI(A, B) = MI(B, A) 🔁  
+            - Does not require distribution assumptions ⚙️
+
+            The **graph** shows the average amount of information shared between the features of the dataset.
+            """)
 
         col_mi_matrice, col_empty1, col_mi_grafo = st.columns([4, 1, 4]) 
 
         with col_mi_matrice:
-            st.markdown("### 🔗 Mutual Information tra Variabili Indipendenti")
+            st.markdown("### 🔗 Mutual Information Across Input Features")
             
             X_cols = pd.DataFrame(X, columns=feature_cols)
 
@@ -1417,7 +1416,7 @@ with tab_relazioni:
             plt.clf()
 
 
-            with st.expander("🔝 Top 10 relazioni", expanded=False):
+            with st.expander("🔝 Top 10 relationships", expanded=False):
                 mi_pairs = (
                     mi_matrix.where(np.triu(np.ones(mi_matrix.shape), k=1).astype(bool))
                     .stack()
@@ -1449,11 +1448,11 @@ with tab_relazioni:
                     )
 
         with col_mi_grafo:
-            st.markdown("### 🕸️ Grafo delle relazioni")
+            st.markdown("### 🕸️ Graph of Relationships")
 
             col_mi_slider, col_empty, col_mi_stat = st.columns([2, 1, 1])
             with col_mi_slider:
-                soglia_mi = st.slider("Soglia min. Mutual Information:", 0.0, 1.0, 0.3, 0.05, key='rel_mi_grafo_slider')
+                soglia_mi = st.slider("Threshold min. Mutual Information:", 0.0, 1.0, 0.3, 0.05, key='rel_mi_grafo_slider')
 
             # Crea grafo
             G_mi = nx.Graph()
@@ -1492,7 +1491,7 @@ with tab_relazioni:
                 net_mi.add_node(
                     node,
                     label=node,
-                    title=f"{node}<br>Gruppo: {group}",
+                    title=f"{node}<br>Group: {group}",
                     color=NODE_COLORS.get(group, "#bfc7d5")
                 )
 
@@ -1505,7 +1504,7 @@ with tab_relazioni:
                 net_mi.add_edge(u, v, value=weight, title=f"Mutual Information: {weight:.3f}", color=color)
 
             with col_mi_stat:
-                st.caption(f"N. di archi: {mi_edges}")
+                st.caption(f"N. edges: {mi_edges}")
 
             net_mi.force_atlas_2based()
             html_content_mi = net_mi.generate_html()
@@ -1537,9 +1536,9 @@ with tab_relazioni:
 with tab_scenario:
     st.markdown("---")
     st.markdown("## 🧮 Scenario Analysis")
-    st.caption("Modifica i valori delle feature per simulare scenari alternativi e vedere l'impatto sul Rank previsto.")
+    st.caption("Modify the feature values to simulate alternative scenarios and see the impact on the predicted Rank.")
     if st.session_state.get('shap_df') is None:
-        st.warning("Per l'analisi di Scenario, devi prima addestrare il modello nel Tab 'Analisi Globale Modello (SHAP)'.")
+        st.warning("To perform Scenario Analysis, you must first train the model in the 'Global Model Analysis (SHAP)' tab.")
     else:
         # Si assume che le librerie necessarie (come pandas, numpy) siano già importate altrove.
         import numpy as np # Necessario per np.array
@@ -1559,11 +1558,11 @@ with tab_scenario:
             uni_names = sorted(df['School name'].unique())
             luiss_name = "Luiss University/Luiss Business School"
             default_index = list(uni_names).index(luiss_name) if luiss_name in uni_names else 0
-            selected_uni_name = st.selectbox("Seleziona Università:", uni_names, index=default_index, key='uni_scenario_select')
+            selected_uni_name = st.selectbox("Select University:", uni_names, index=default_index, key='uni_scenario_select')
         uni_idx = df_reset.index[df_reset['School name'] == selected_uni_name][0]
         uni_score_original = float(df_reset.iloc[uni_idx]['Rank'])
         ft_rank_original = int(df_reset['Rank'].max() - uni_score_original + 1)
-        # valori originali feature
+        # original feature values
         df_features = pd.DataFrame(X, columns=feature_cols)
         original_values = {col: float(df_features.iloc[uni_idx][col]) for col in feature_cols}
         
@@ -1589,9 +1588,9 @@ with tab_scenario:
 
         with col_reset:
             st.markdown(""); st.markdown("")
-            if st.button("🔄 Reset ai valori originali", use_container_width=True, on_click=reset_scenario):
-                # Se il reset è chiamato (callback), lo stato è già aggiornato.
-                # Qui non facciamo nulla.
+            if st.button("🔄 Reset to Original Values", use_container_width=True, on_click=reset_scenario):
+                # If reset is called (callback), the state is already updated.
+                # Here we do nothing.
                 pass
         st.markdown("---")
         
@@ -1599,8 +1598,8 @@ with tab_scenario:
         col_scores, col_features = st.columns([1, 4])
         
         with col_features:
-            st.subheader("⚙️ Modifica Feature")
-            st.caption("Imposta i valori e premi 'Calcola scenario' per aggiornare il punteggio.")
+            st.subheader("⚙️ Modify Feature")
+            st.caption("Set the values and press 'Calculate Scenario' to update the score.")
 
             if 'scenario_result' not in st.session_state:
                 st.session_state['scenario_result'] = None
@@ -1608,7 +1607,7 @@ with tab_scenario:
             with st.form("scenario_form", clear_on_submit=False):
                 col_empty_form, col_submit = st.columns([1, 4])
                 with col_submit:
-                    submitted = st.form_submit_button("🚀 Calcola scenario",
+                    submitted = st.form_submit_button("🚀 Calculate Scenario",
                                                        use_container_width=True,
                                                        type='primary')
                 
@@ -1647,7 +1646,7 @@ with tab_scenario:
                             value=current_val, # Usa il valore correttamente inizializzato
                             step=float(step),
                             key=f"slider_{feature}",
-                            help=f"Valore originale: {original_val}",
+                            help=f"Original value: {original_val}",
                             label_visibility="collapsed" #"visible"
                         )
                     
@@ -1678,17 +1677,17 @@ with tab_scenario:
 
         # --- COLONNA SCORE (Nessuna modifica necessaria qui) ---
         with col_scores:
-            st.subheader("📊 Risultati")
+            st.subheader("📊 Results")
             # box punteggio originale
             st.markdown(f"""
                 <div style="background-color:#f0f2f6; padding:20px; border-radius:10px; margin-bottom:15px;">
-                    <h4 style="margin:0; color:#555;">Punteggio Originale</h4>
+                    <h4 style="margin:0; color:#555;">Original Score</h4>
                     <h2 style="margin:10px 0; color:#333;">{uni_score_original:.2f}</h2>
                 </div>
             """, unsafe_allow_html=True)
             
             if st.session_state['scenario_result'] is None:
-                st.info("Imposta i valori e premi **Calcola scenario**.")
+                st.info("Set the values and press **Calculate Scenario**.")
             else:
                 predicted_score = st.session_state['scenario_result']['predicted_score']
                 predicted_rank = st.session_state['scenario_result']['predicted_rank']
@@ -1714,15 +1713,15 @@ with tab_scenario:
                     
                 st.markdown(f"""
                     <div style="background-color:{box_color}; padding:20px; border-radius:10px; border:2px solid {border_color}; margin-bottom:15px;">
-                        <h4 style="margin:0; color:#555;">{icon} Punteggio Previsto</h4>
+                        <h4 style="margin:0; color:#555;">{icon} Predicted Score</h4>
                         <h2 style="margin:10px 0; color:#333;">{predicted_score:.2f}</h2>
                     </div>
                 """, unsafe_allow_html=True)
                 
                 st.markdown(f"""
                     <div style="background-color:#fff; padding:15px; border-radius:10px; border:2px solid {border_color};">
-                        <h4 style="margin:0 0 10px 0; color:#555;">Variazione</h4>
-                        <p style="margin:5px 0;"><strong>Score:</strong> {score_diff:+.2f} punti</p>
+                        <h4 style="margin:0 0 10px 0; color:#555;">Variation</h4>
+                        <p style="margin:5px 0;"><strong>Score:</strong> {score_diff:+.2f} points</p>
                         <p style="margin:10px 0 0 0; color:#666; font-style:italic;">{status}</p>
                     </div>
                 """, unsafe_allow_html=True)
