@@ -1313,7 +1313,7 @@ with tab_relazioni:
 
                     color = "#F1B17C" if weight >= 0 else "#87D8F7"
 
-                    net_corr.add_edge(u, v, value=abs_weight, title=f"Correlazione: {weight:.3f}", color=color, width=edge_width)
+                    net_corr.add_edge(u, v, value=abs_weight, title=f"Correlation: {weight:.3f}", color=color, width=edge_width)
 
             with col_corr_stat:
                 st.caption(f"N. edges: {corr_edges}")
