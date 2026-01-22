@@ -503,7 +503,7 @@ def plot_shap_summary_bar(shap_values, feature_cols):
         x='Importance', 
         y='Feature', 
         orientation='h', 
-        labels={'Importance': 'Importanza SHAP (Media Assoluta)', 'Feature': 'Feature'}
+        labels={'Importance': 'SHAP Importance (Mean Absolute Value)', 'Feature': 'Feature'}
     )
     # Aggiorna il layout con un colore più scuro (coerente con la nuova palette)
     fig.update_traces(marker_color='#41a4ff')
