@@ -611,7 +611,7 @@ with tab_esplorazione:
 
     invert_rank = st.toggle(
         "Invert Rank (higher = better position)",
-        value=True, 
+        value=False, 
         key="invert_rank",
         help="If enabled, reverses the values of the 'rank' columns, so that a higher value corresponds to a better position.",
         on_change=reset_app_state_on_toggle
@@ -1170,7 +1170,7 @@ with tab_relazioni:
             radio_option = st.radio(
                 "Correlation Method:",
                 ('Pearson', 'Spearman'),
-                index=0,
+                index=1, # Default to Spearman
                 horizontal=True,
                 key='rel_corr_method'
             )
