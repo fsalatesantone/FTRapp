@@ -1244,7 +1244,7 @@ with tab_relazioni:
                     )
 
         with col_corr_grafo:
-            st.markdown("### 🕸️ Correlation Graph")
+            st.markdown("### 🕸️ Graph of bivariate Correlations")
 
             col_corr_slider, col_empty, col_corr_stat = st.columns([2, 1, 1])
             with col_corr_slider:
@@ -1448,7 +1448,7 @@ with tab_relazioni:
                     )
 
         with col_mi_grafo:
-            st.markdown("### 🕸️ Graph of Relationships")
+            st.markdown("### 🕸️ Graph of bivariate Relationships")
 
             col_mi_slider, col_empty, col_mi_stat = st.columns([2, 1, 1])
             with col_mi_slider:
