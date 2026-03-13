@@ -697,7 +697,7 @@ with tab_esplorazione:
         st.success("Upload successful.")
         st.markdown("---")
         df = st.session_state['df']
-        st.header(f"Input table {st.session_state['perimeter']}")
+        st.header(f"Input table '{st.session_state['perimeter']}'")
 
         # Visualizzazione Tabella Completa
         invert_rank_state = st.session_state.get('invert_rank', True)
@@ -734,58 +734,198 @@ with tab_esplorazione:
             * **Carbon footprint rank**: Ranking based on the school's carbon footprint (direct and indirect emissions). Measures how "virtuous" the school is from an environmental perspective.
             """)
         st.markdown("---")
-        
-        # Controlli per l'evidenziazione
-        col_sel, col_empty = st.columns([1, 3])
-        with col_sel:
-            # Trova l'indice della LUISS (per preselezionarla)
+
+        with st.expander("🏆 Comparative Ranking Analysis", expanded=True):
+            st.subheader("Horizontal Bar Chart Analysis")
+
             luiss_name = "Luiss University/Luiss Business School"
-            default_unis = [luiss_name] if luiss_name in df['School name'].unique() else df['School name'].unique()[:1].tolist()
-
-            selected_unis = st.multiselect(
-                "Select Universities to be highlighted in the charts:",
-                sorted(df['School name'].unique()),
-                default=default_unis,
-                key='exp_highlight_unis'
-            )
-
-        # Suddivisione dei grafici a barre in due colonne
-        col_rank_chart, col_var_chart = st.columns(2)
-
-        with col_rank_chart:
-            # Grafico di Classifica Generale (Rank)
-            st.subheader("General Ranking")
-            st.markdown("")
+            all_unis = sorted(df['School name'].unique())
             
-            fig_rank = plot_ranked_variable(
-                df,
-                'Rank',
-                selected_unis,
-                "Ranking by Rank"
-            )
-            st.plotly_chart(fig_rank, use_container_width=True)
+            # Define benchmark options (excluding Luiss)
+            benchmark_options = [u for u in all_unis if u != luiss_name]
+            
+            # Auto-detect Bocconi index
+            bocconi_indices = [i for i, s in enumerate(benchmark_options) if "Bocconi" in s]
+            default_bench_idx = bocconi_indices[0] if bocconi_indices else 0
+
+            col_bench_sel, col_var_sel = st.columns(2)
+            
+            with col_bench_sel:
+                selected_benchmark = st.selectbox(
+                    "Select Benchmark University for comparison:",
+                    benchmark_options,
+                    index=default_bench_idx,
+                    key='ranking_benchmark_select'
+                )
+                # We define our target highlights here
+                highlight_list = [luiss_name, selected_benchmark]
+
+            with col_var_sel:
+                numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c not in ['Rank', 'School name']]
+                selected_variable = st.selectbox(
+                    "Select metric for variable ranking:",
+                    numeric_cols,
+                    index=numeric_cols.index('Weighted salary (US$)') if 'Weighted salary (US$)' in numeric_cols else 0,
+                    key='ranking_variable_select'
+                )
+
+            # --- 2. Chart Customization Logic ---
+            # Colors matching the Boxplot setup
+            color_luiss = '#41a4ff'      # Light Blue
+            color_benchmark = '#0b3d91'  # Dark Blue
+            color_default = '#d9e5f2'    # Soft Gray for others
+
+            def plot_custom_ranked_bars(df, variable, luiss, benchmark, title):
+                df_plot = df.sort_values(variable, ascending=True).reset_index(drop=True)
+                
+                # Assign colors based on university identity
+                def assign_color(name):
+                    if name == luiss: return color_luiss
+                    if name == benchmark: return color_benchmark
+                    return color_default
+
+                df_plot['Color_Logic'] = df_plot['School name'].apply(assign_color)
+                
+                fig = px.bar(
+                    df_plot,
+                    x=variable,
+                    y='School name',
+                    orientation='h',
+                    title=title,
+                    color='Color_Logic',
+                    color_discrete_map="identity", # Uses the hex codes in the column
+                    hover_data={'Rank': ':.0f', variable: ':.2f'}
+                )
+                
+                # Optimize height and labels
+                dyn_height = max(600, len(df) * 25)
+                fig.update_layout(
+                    height=dyn_height,
+                    margin=dict(l=200, r=20, t=50, b=50),
+                    showlegend=False,
+                    xaxis_title=variable,
+                    yaxis_title=None,
+                    yaxis={'categoryorder':'array', 'categoryarray': df_plot['School name'].tolist()}
+                )
+                return fig
+
+            # --- 3. Rendering ---
+            col_left, col_right = st.columns(2)
+
+            with col_left:
+                # st.write("### General Rank Positioning")
+                fig_rank = plot_custom_ranked_bars(
+                    df, 'Rank', luiss_name, selected_benchmark, "Overall Ranking Position"
+                )
+                st.plotly_chart(fig_rank, use_container_width=True)
+                
+            with col_right:
+                # st.write(f"### Metric Focus: {selected_variable}")
+                fig_var = plot_custom_ranked_bars(
+                    df, selected_variable, luiss_name, selected_benchmark, f"Top Universities by {selected_variable}"
+                )
+                st.plotly_chart(fig_var, use_container_width=True)
         
-        with col_var_chart:
-            # Grafico di Classifica per Variabile Selezionata
-            st.subheader("Ranking by Selected Variable")
+        # --- EXPANDER 2: DISTRIBUTION & DENSITY ---
+        with st.expander("🎻 Statistical Distribution & Positioning", expanded=True):
+            st.subheader("Box and Violin Plot Analysis")
 
-            # Filtra le colonne numeriche disponibili per i plot
-            numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c != 'Rank' and c != 'School name']
-            
-            selected_variable = st.selectbox(
-                "Select the variable to define the ranking:",
-                numeric_cols,
-                index=numeric_cols.index('Weighted salary (US$)') if 'Weighted salary (US$)' in numeric_cols else 0,
-                key='exp_variable_select'
-            )
-            
-            fig_var = plot_ranked_variable(
-                df,
-                selected_variable,
-                selected_unis,
-                f"Ranking by: '{selected_variable}'"
-            )
-            st.plotly_chart(fig_var, use_container_width=True)
+            # Parametri di stile (identici per coerenza)
+            color_luiss = '#41a4ff'
+            color_benchmark = '#0b3d91'
+            luiss_name = "Luiss University/Luiss Business School"
+
+            # Layout Selettori
+            col_bench, col_vars = st.columns([1, 1])
+
+            with col_bench:
+                # 1. Selezione Benchmark - CHIAVE UNICA: 'dist_benchmark_select'
+                benchmark_options = sorted([u for u in df['School name'].unique() if u != luiss_name])
+                bocconi_indices = [i for i, s in enumerate(benchmark_options) if "Bocconi" in s]
+                default_bench_idx = bocconi_indices[0] if bocconi_indices else 0
+
+                selected_benchmark = st.selectbox(
+                    "Select Benchmark University for comparison:",
+                    benchmark_options,
+                    index=default_bench_idx,
+                    key='dist_benchmark_select'
+                )
+
+            with col_vars:
+                # 2. Scelta variabili
+                numeric_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c]) and c not in ['School name', 'Rank']]
+                
+                selected_vars_box = st.multiselect(
+                    "Select variables to visualize:", 
+                    numeric_cols, 
+                    default=numeric_cols[:1],
+                    key='dist_vars_multi'
+                )
+
+            # Loop dei grafici FUORI dalle colonne per usare tutta la larghezza dell'expander
+            for var in selected_vars_box:
+                fig_dist = go.Figure()
+                
+                # 1. Elegant, Edge-Free Violin Plot
+                fig_dist.add_trace(go.Violin(
+                    x=df[var],
+                    y=[0] * len(df),
+                    name="Density",
+                    orientation='h',
+                    side='both',
+                    line_color='white',
+                    line_width=0,
+                    fillcolor='rgba(180, 200, 230, 0.25)', 
+                    hoveron='violins',
+                    hoverinfo='x',
+                    box_visible=True,      
+                    box_width=0.4,         
+                    box_fillcolor='rgba(255, 255, 255, 0.5)', 
+                    box_line_color='#576574', 
+                    box_line_width=1,
+                    meanline_visible=True,
+                    meanline_color='#2c3e50',
+                    meanline_width=2,
+                    spanmode='soft',
+                    points=False
+                ))
+
+                # 2. Luiss marker
+                if luiss_name in df['School name'].values:
+                    val_l = df[df['School name'] == luiss_name][var].values[0]
+                    fig_dist.add_trace(go.Scatter(
+                        x=[val_l], y=[0],
+                        mode='markers', name='Luiss',
+                        marker=dict(color=color_luiss, size=20, symbol='diamond', line=dict(width=2, color='white')),
+                        hovertemplate=f"<b>Luiss</b><br>{var}: %{{x}}<extra></extra>"
+                    ))
+
+                # 3. Benchmark marker
+                val_b = df[df['School name'] == selected_benchmark][var].values[0]
+                fig_dist.add_trace(go.Scatter(
+                    x=[val_b], y=[0],
+                    mode='markers', name=selected_benchmark,
+                    marker=dict(color=color_benchmark, size=20, symbol='x', line=dict(width=2, color='white')),
+                    hovertemplate=f"<b>{selected_benchmark}</b><br>{var}: %{{x}}<extra></extra>"
+                ))
+
+                fig_dist.update_layout(
+                    title=dict(text=f"{var}", font=dict(size=18)),
+                    height=350,
+                    xaxis_title=var,
+                    yaxis_showticklabels=False,
+                    yaxis_range=[-0.5, 0.5],
+                    yaxis_zeroline=False,
+                    margin=dict(l=20, r=20, t=80, b=50),
+                    plot_bgcolor='white',
+                    showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.1, xanchor="center", x=0.5)
+                )
+                
+                fig_dist.update_xaxes(showgrid=True, gridcolor='#f2f2f2', zeroline=False)
+                st.plotly_chart(fig_dist, use_container_width=True)
+
+        
 
 
 # -----------------------------------------------------
@@ -873,51 +1013,247 @@ with tab_modello:
                 """)
                 st.info("Note: The high R² suggests a good fit for the SHAP interpretability analysis.")
 
-            # --- Contenitore 2: Grafici di Importanza e Distribuzione SHAP ---
-            st.markdown("---")
-            st.header("SHAP Analysis - Model Interpretability")
-            col_bar, col_beeswarm = st.columns(2)
+            # --- Contenitore SHAP Analysis - Model Interpretability ---
+            with st.expander("SHAP Analysis - Model Interpretability", expanded=True):
+                st.header("SHAP Analysis - Model Interpretability")
+                col_bar, col_beeswarm = st.columns(2)
 
-            with col_bar:
-                st.subheader("Feature Importance")
-                st.caption("Shows the features ranked in descending order of their mean absolute importance in determining the Rank.")
-                # Grafico a barre con Plotly
-                st.plotly_chart(plot_shap_summary_bar(shap_values, feature_cols), use_container_width=True)
+                with col_bar:
+                    st.subheader("Feature Importance")
+                    st.caption("Shows the features ranked in descending order of their mean absolute importance in determining the Rank.")
+                    # Grafico a barre con Plotly
+                    st.plotly_chart(plot_shap_summary_bar(shap_values, feature_cols), use_container_width=True)
 
-            with col_beeswarm:
-                st.subheader("SHAP Beeswarm Plot - Distribution of Effects")
-                st.caption("Each point represents a university. The color indicates the feature value, and the horizontal position indicates the impact on the Rank (SHAP value).")
-                # Beeswarm plot (Matplotlib, uses cache)
-                st.pyplot(plot_shap_beeswarm(shap_values, X, feature_cols), use_container_width=True)
+                with col_beeswarm:
+                    st.subheader("SHAP Beeswarm Plot - Distribution of Effects")
+                    st.caption("Each point represents a university. The color indicates the feature value, and the horizontal position indicates the impact on the Rank (SHAP value).")
+                    # Beeswarm plot (Matplotlib, uses cache)
+                    st.pyplot(plot_shap_beeswarm(shap_values, X, feature_cols), use_container_width=True)
 
-            # --- Contenitore 3: Dependence Plots (Focus sulle interazioni) ---
-            st.markdown("---")
-            
-            # 1. Slider per la selezione del numero di feature
-            col_slider, col_empty = st.columns([3, 7]) # Divisione in colonne per limitare la larghezza dello slider
-            
-            with col_slider:
-                max_features = len(shap_values[0])
-                top_n_var = st.slider("Number of features to display:", 1, max_features, min(9, max_features), step=1, key='mod_slider_features')
+            # --- Contenitore SHAP Analysis - Dependence Plots (Focus sulle interazioni) ---
+            with st.expander("SHAP Analysis - Dependence Plots", expanded=True):
+                st.header("SHAP Analysis - Dependence Plots")
+                
+                # 1. Slider per la selezione del numero di feature
+                col_slider, col_empty = st.columns([3, 7]) # Divisione in colonne per limitare la larghezza dello slider
+                
+                with col_slider:
+                    max_features = len(shap_values[0])
+                    top_n_var = st.slider("Number of features to display:", 1, max_features, min(9, max_features), step=1, key='mod_slider_features')
 
-            st.subheader(f"SHAP Dependence Plots (Interactions with Rank) - Top {top_n_var} Features")
-            st.caption("These plots show the effect of a single feature on the Rank, coloring the points based on the actual Rank of that university.")
+                st.subheader(f"SHAP Dependence Plots (Interactions with Rank) - Top {top_n_var} Features")
+                st.caption("These plots show the effect of a single feature on the Rank, coloring the points based on the actual Rank of that university.")
 
-            # Find the indices of the top_n_var most important features
-            feature_importance = np.abs(shap_values).mean(axis=0)
-            top_features_idx = np.argsort(feature_importance)[-top_n_var:][::-1]
+                # Find the indices of the top_n_var most important features
+                feature_importance = np.abs(shap_values).mean(axis=0)
+                top_features_idx = np.argsort(feature_importance)[-top_n_var:][::-1]
 
-            # Determine the layout of the subplots based on the number of top_n_var
-            n_cols = 3
+                # Determine the layout of the subplots based on the number of top_n_var
+                n_cols = 3
 
-            # Create columns for the dependence plots
-            all_cols = st.columns(n_cols)
+                # Create columns for the dependence plots
+                all_cols = st.columns(n_cols)
 
-            # Iterate over the top N indices and generate the plots
-            for i, feat_idx in enumerate(top_features_idx):
-                with all_cols[i % n_cols]:
-                    fig = plot_shap_dependence(feat_idx, shap_values_extended, X_with_ranking, feature_cols_with_ranking)
-                    st.pyplot(fig, use_container_width=True)
+                # Iterate over the top N indices and generate the plots
+                for i, feat_idx in enumerate(top_features_idx):
+                    with all_cols[i % n_cols]:
+                        fig = plot_shap_dependence(feat_idx, shap_values_extended, X_with_ranking, feature_cols_with_ranking)
+                        st.pyplot(fig, use_container_width=True)
+
+
+            # # --- Contenitore 4: SHAP Interaction Values ---
+            # with st.expander("🕸️ SHAP Feature Interactions Analysis", expanded=True):
+            #     st.subheader("SHAP Feature Interaction Analysis")
+
+            #     popover_shap_inter = st.popover("ℹ️ SHAP Feature Interaction Info")
+            #     with popover_shap_inter:
+            #         st.caption("📘 SHAP Feature Interaction")
+            #         st.markdown("""
+            #         ### 📘 SHAP Feature Interaction
+            #         In complex predictive models, the impact of a single variable on the final outcome is rarely entirely independent. Often, the true effect of one feature depends heavily on the specific value of another. 
+            #         While standard SHAP analysis calculates the overall contribution of each feature, **SHAP Interaction Values** allow us to decompose this contribution. They isolate the **main effect** (the feature acting independently) from the **interaction effect** (the feature's impact when coupled with another specific variable).
+                    
+            #         #### 📊 How to Interpret the Analysis
+            #         * **Interaction Strength (Magnitude):** Indicated by matrix values and graph edge thickness. Higher absolute values denote a strong coupled relationship, signifying that the model relies heavily on the specific combination of these features rather than their isolated contributions.
+
+            #         * **Direction of the Effect (Sign):** Indicated by color coding.
+            #             * **Positive Interaction:** Highlights a synergy. The combined presence of the features amplifies their impact, yielding a score higher than the sum of their individual effects.
+            #             * **Negative Interaction:** Highlights an antagonistic relationship. One feature dampens the impact of the other, resulting in a lower-than-expected combined effect.                    
+            #         """)
+
+            #     # Assicuriamoci che le variabili siano disponibili
+            #     shap_data = st.session_state['shap_data']
+            #     explainer = shap_data['explainer']
+            #     X = shap_data['X']
+            #     feature_cols = st.session_state['model_results']['feature_cols']
+            #     current_perimeter = st.session_state.get('perimeter', 'custom')
+
+            #     # 1. Calcolo (con caching in session state per performance)
+            #     # Ora controlliamo il perimetro corrente invece di selected_uni_name
+            #     if 'shap_inter' not in st.session_state or st.session_state.get('last_inter_calc') != current_perimeter:
+            #         with st.spinner("Calculating SHAP interaction values (this might take a few seconds)..."):
+            #             # Calcola interazioni (restituisce array 3D: n_obs x n_feat x n_feat)
+            #             shap_inter = explainer.shap_interaction_values(X)
+            #             st.session_state['shap_inter'] = shap_inter
+            #             st.session_state['last_inter_calc'] = current_perimeter
+                
+            #     shap_inter = st.session_state['shap_inter']
+            #     p = len(feature_cols)
+
+            #     # 2. Aggregazioni Globali
+            #     inter_abs_mean = np.abs(shap_inter).mean(axis=0)   # Forza dell'interazione
+            #     inter_sign_mean = shap_inter.mean(axis=0)          # Direzione (segno) dell'interazione
+                
+            #     # Rimuovi i main effects dalla diagonale per concentrarci solo sulle interazioni pure
+            #     np.fill_diagonal(inter_abs_mean, 0.0)
+            #     np.fill_diagonal(inter_sign_mean, 0.0)
+
+            #     inter_matrix = pd.DataFrame(inter_abs_mean, index=feature_cols, columns=feature_cols)
+
+            #     # Generazione lista delle coppie
+            #     pairs = []
+            #     for i in range(p):
+            #         for j in range(i + 1, p):
+            #             pairs.append((
+            #                 feature_cols[i], 
+            #                 feature_cols[j], 
+            #                 inter_abs_mean[i, j], 
+            #                 inter_sign_mean[i, j]
+            #             ))
+
+            #     inter_pairs_df = (pd.DataFrame(pairs, columns=["Feature 1", "Feature 2", "Strength_mean_abs", "Sign_mean"])
+            #                       .sort_values("Strength_mean_abs", ascending=False)
+            #                       .reset_index(drop=True))
+
+            #     # --- Layout Colonne (Matrice vs Grafo) ---
+            #     col_inter_mat, col_inter_empty, col_inter_graph = st.columns([4, 1, 4])
+
+            #     with col_inter_mat:
+            #         st.markdown("### 🔗 Interaction Matrix (Mean Absolute Value)")
+                    
+            #         # Heatmap
+            #         fig_inter, ax_inter = plt.subplots(figsize=(8, 7))
+            #         sns.heatmap(inter_matrix, cmap="YlGnBu", linewidths=0.2, ax=ax_inter, 
+            #                     xticklabels=True, yticklabels=True)
+            #         # Ottimizzazione font asse
+            #         ax_inter.tick_params(axis='both', which='major', labelsize=8)
+            #         st.pyplot(fig_inter, use_container_width=True)
+
+            #         # Top 10 Lista
+            #         #with st.expander("🔝 Top 10 Feature Interactions", expanded=False):
+            #         st.markdown("### 🔝 Top 10 Feature Interactions")
+            #         top_10_inter = inter_pairs_df.head(10)
+            #         for _, row in top_10_inter.iterrows():
+            #             # Colori per positivo/negativo
+            #             color_bg = "#fef3eb" if row['Sign_mean'] >= 0 else "#eef9fd"
+            #             border_color = "#F1B17C" if row['Sign_mean'] >= 0 else "#87D8F7"
+            #             value_bg = "#E67E22" if row['Sign_mean'] >= 0 else "#2980B9"
+
+            #             st.markdown(
+            #                 f"""
+            #                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+            #                     <div style="flex:1; background-color:{color_bg}; padding:6px 6px; border-radius:6px;
+            #                                 border:1px solid {border_color}; color:#1a1a1a; font-size: 14px;">
+            #                         {row['Feature 1']} ↔ {row['Feature 2']}
+            #                     </div>
+            #                     <div style="width:5px;"></div>
+            #                     <div style="width:75px; text-align:center; background-color:{value_bg}; color:white;
+            #                                 padding:6px 0; border-radius:6px; font-family:monospace; font-size: 14px;">
+            #                         {row['Strength_mean_abs']:.3f}
+            #                     </div>
+            #                 </div>
+            #                 """,
+            #                 unsafe_allow_html=True
+            #             )
+
+            #     with col_inter_graph:
+            #         st.markdown("### 🕸️ Interaction Network Graph")
+                    
+            #         col_slider_inter, col_stat_inter = st.columns([3, 1])
+            #         with col_slider_inter:
+            #             # Chiave univoca per lo slider
+            #             top_k_inter = st.slider("Select Top K interactions to plot:", 5, 30, 10, step=1, key='inter_top_k_slider')
+                    
+            #         # Preparazione Dati Grafo
+            #         top_df = inter_pairs_df.head(top_k_inter).copy()
+            #         G_inter = nx.Graph()
+
+            #         nodes = pd.unique(top_df[["Feature 1", "Feature 2"]].values.ravel("K"))
+            #         for n in nodes:
+            #             G_inter.add_node(n)
+
+            #         for _, row in top_df.iterrows():
+            #             G_inter.add_edge(row["Feature 1"], row["Feature 2"], 
+            #                              strength=float(row["Strength_mean_abs"]), 
+            #                              sign_mean=float(row["Sign_mean"]))
+
+            #         # Inizializzazione PyVis
+            #         net_inter = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black", directed=False)
+
+            #         # Colori nodi
+            #         var_type = build_var_type_map(df)
+            #         NODE_COLORS = {
+            #             "Alumni survey": "#87D8F7",
+            #             "School survey": "#0b3d91",
+            #             "Unknown": "#81848b"
+            #         }
+
+            #         for node in G_inter.nodes:
+            #             group = var_type.get(node, "Unknown")
+            #             net_inter.add_node(
+            #                 node,
+            #                 label=node,
+            #                 title=f"{node}",
+            #                 color=NODE_COLORS.get(group, "#bfc7d5")
+            #             )
+
+            #         # Scaling archi
+            #         max_strength = top_df["Strength_mean_abs"].max() if not top_df.empty else 1.0
+            #         min_width, max_width = 1.0, 10.0
+
+            #         for u, v, d in G_inter.edges(data=True):
+            #             strength = d["strength"]
+            #             sign_mean = d["sign_mean"]
+            #             width = min_width + (strength / max_strength) * (max_width - min_width) if max_strength > 0 else min_width
+            #             color = "#F1B17C" if sign_mean >= 0 else "#87D8F7"
+            #             title_html = (f"Strength: {strength:.3f}")
+            #             net_inter.add_edge(u, v, value=strength, title=title_html, color=color, width=width)
+
+            #         with col_stat_inter:
+            #             st.caption(f"Nodes: {len(nodes)}<br>Edges: {len(top_df)}", unsafe_allow_html=True)
+
+            #         # Rendering HTML
+            #         net_inter.force_atlas_2based()
+            #         html_content_inter = net_inter.generate_html()
+            #         html_content_inter = html_content_inter.replace(
+            #             "</body>",
+            #             """
+            #             <script type="text/javascript">
+            #                 window.addEventListener('load', () => {
+            #                     if (typeof network !== 'undefined') { network.fit(); }
+            #                 });
+            #             </script>
+            #             </body>
+            #             """
+            #         )
+                    
+            #         # Legenda
+            #         st.markdown(
+            #             """
+            #             <div style="font-size: 13px; margin-bottom: 10px;">
+            #                 <span style="color:#8fd3ff">●</span> Alumni survey &nbsp; 
+            #                 <span style="color:#0b3d91">●</span> School survey &nbsp; <br>
+            #                 <span style="display:inline-block; width:20px; border-top:4px solid #F1B17C; vertical-align:middle;"></span> Positive Avg. Interaction &nbsp;
+            #                 <span style="display:inline-block; width:20px; border-top:4px solid #87D8F7; vertical-align:middle;"></span> Negative Avg. Interaction
+            #             </div>
+            #             """,
+            #             unsafe_allow_html=True
+            #         )
+                    
+            #         components.html(html_content_inter, height=650, scrolling=True)
+
+
+
         else:
             if uploaded_file is None:
                 st.info("Click the button to upload the pre-trained model and compute the SHAP values.")
