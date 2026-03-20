@@ -1166,91 +1166,91 @@ with tab_modello:
                             unsafe_allow_html=True
                         )
 
-                with col_inter_graph:
-                    st.markdown("### 🕸️ Interaction Network Graph")
+                # with col_inter_graph:
+                #     st.markdown("### 🕸️ Interaction Network Graph")
                     
-                    col_slider_inter, col_stat_inter = st.columns([3, 1])
-                    with col_slider_inter:
-                        # Chiave univoca per lo slider
-                        top_k_inter = st.slider("Select Top K interactions to plot:", 5, 30, 10, step=1, key='inter_top_k_slider')
+                #     col_slider_inter, col_stat_inter = st.columns([3, 1])
+                #     with col_slider_inter:
+                #         # Chiave univoca per lo slider
+                #         top_k_inter = st.slider("Select Top K interactions to plot:", 5, 30, 10, step=1, key='inter_top_k_slider')
                     
-                    # Preparazione Dati Grafo
-                    top_df = inter_pairs_df.head(top_k_inter).copy()
-                    G_inter = nx.Graph()
+                #     # Preparazione Dati Grafo
+                #     top_df = inter_pairs_df.head(top_k_inter).copy()
+                #     G_inter = nx.Graph()
 
-                    nodes = pd.unique(top_df[["Feature 1", "Feature 2"]].values.ravel("K"))
-                    for n in nodes:
-                        G_inter.add_node(n)
+                #     nodes = pd.unique(top_df[["Feature 1", "Feature 2"]].values.ravel("K"))
+                #     for n in nodes:
+                #         G_inter.add_node(n)
 
-                    for _, row in top_df.iterrows():
-                        G_inter.add_edge(row["Feature 1"], row["Feature 2"], 
-                                         strength=float(row["Strength_mean_abs"]), 
-                                         sign_mean=float(row["Sign_mean"]))
+                #     for _, row in top_df.iterrows():
+                #         G_inter.add_edge(row["Feature 1"], row["Feature 2"], 
+                #                          strength=float(row["Strength_mean_abs"]), 
+                #                          sign_mean=float(row["Sign_mean"]))
 
-                    # Inizializzazione PyVis
-                    net_inter = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black", directed=False)
+                #     # Inizializzazione PyVis
+                #     net_inter = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black", directed=False)
 
-                    # Colori nodi
-                    var_type = build_var_type_map(df)
-                    NODE_COLORS = {
-                        "Alumni survey": "#87D8F7",
-                        "School survey": "#0b3d91",
-                        "Unknown": "#81848b"
-                    }
+                #     # Colori nodi
+                #     var_type = build_var_type_map(df)
+                #     NODE_COLORS = {
+                #         "Alumni survey": "#87D8F7",
+                #         "School survey": "#0b3d91",
+                #         "Unknown": "#81848b"
+                #     }
 
-                    for node in G_inter.nodes:
-                        group = var_type.get(node, "Unknown")
-                        net_inter.add_node(
-                            node,
-                            label=node,
-                            title=f"{node}",
-                            color=NODE_COLORS.get(group, "#bfc7d5")
-                        )
+                #     for node in G_inter.nodes:
+                #         group = var_type.get(node, "Unknown")
+                #         net_inter.add_node(
+                #             node,
+                #             label=node,
+                #             title=f"{node}",
+                #             color=NODE_COLORS.get(group, "#bfc7d5")
+                #         )
 
-                    # Scaling archi
-                    max_strength = top_df["Strength_mean_abs"].max() if not top_df.empty else 1.0
-                    min_width, max_width = 1.0, 10.0
+                #     # Scaling archi
+                #     max_strength = top_df["Strength_mean_abs"].max() if not top_df.empty else 1.0
+                #     min_width, max_width = 1.0, 10.0
 
-                    for u, v, d in G_inter.edges(data=True):
-                        strength = d["strength"]
-                        sign_mean = d["sign_mean"]
-                        width = min_width + (strength / max_strength) * (max_width - min_width) if max_strength > 0 else min_width
-                        color = "#F1B17C" if sign_mean >= 0 else "#87D8F7"
-                        title_html = (f"Strength: {strength:.3f}")
-                        net_inter.add_edge(u, v, value=strength, title=title_html, color=color, width=width)
+                #     for u, v, d in G_inter.edges(data=True):
+                #         strength = d["strength"]
+                #         sign_mean = d["sign_mean"]
+                #         width = min_width + (strength / max_strength) * (max_width - min_width) if max_strength > 0 else min_width
+                #         color = "#F1B17C" if sign_mean >= 0 else "#87D8F7"
+                #         title_html = (f"Strength: {strength:.3f}")
+                #         net_inter.add_edge(u, v, value=strength, title=title_html, color=color, width=width)
 
-                    with col_stat_inter:
-                        st.caption(f"Nodes: {len(nodes)}<br>Edges: {len(top_df)}", unsafe_allow_html=True)
+                #     with col_stat_inter:
+                #         st.caption(f"Nodes: {len(nodes)}<br>Edges: {len(top_df)}", unsafe_allow_html=True)
 
-                    # Rendering HTML
-                    net_inter.force_atlas_2based()
-                    html_content_inter = net_inter.generate_html()
-                    html_content_inter = html_content_inter.replace(
-                        "</body>",
-                        """
-                        <script type="text/javascript">
-                            window.addEventListener('load', () => {
-                                if (typeof network !== 'undefined') { network.fit(); }
-                            });
-                        </script>
-                        </body>
-                        """
-                    )
+                #     # Rendering HTML
+                #     net_inter.force_atlas_2based()
+                #     html_content_inter = net_inter.generate_html()
+                #     html_content_inter = html_content_inter.replace(
+                #         "</body>",
+                #         """
+                #         <script type="text/javascript">
+                #             window.addEventListener('load', () => {
+                #                 if (typeof network !== 'undefined') { network.fit(); }
+                #             });
+                #         </script>
+                #         </body>
+                #         """
+                #     )
                     
-                    # Legenda
-                    st.markdown(
-                        """
-                        <div style="font-size: 13px; margin-bottom: 10px;">
-                            <span style="color:#8fd3ff">●</span> Alumni survey &nbsp; 
-                            <span style="color:#0b3d91">●</span> School survey &nbsp; <br>
-                            <span style="display:inline-block; width:20px; border-top:4px solid #F1B17C; vertical-align:middle;"></span> Positive Avg. Interaction &nbsp;
-                            <span style="display:inline-block; width:20px; border-top:4px solid #87D8F7; vertical-align:middle;"></span> Negative Avg. Interaction
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
+                #     # Legenda
+                #     st.markdown(
+                #         """
+                #         <div style="font-size: 13px; margin-bottom: 10px;">
+                #             <span style="color:#8fd3ff">●</span> Alumni survey &nbsp; 
+                #             <span style="color:#0b3d91">●</span> School survey &nbsp; <br>
+                #             <span style="display:inline-block; width:20px; border-top:4px solid #F1B17C; vertical-align:middle;"></span> Positive Avg. Interaction &nbsp;
+                #             <span style="display:inline-block; width:20px; border-top:4px solid #87D8F7; vertical-align:middle;"></span> Negative Avg. Interaction
+                #         </div>
+                #         """,
+                #         unsafe_allow_html=True
+                #     )
                     
-                    components.html(html_content_inter, height=650, scrolling=True)
+                #     components.html(html_content_inter, height=650, scrolling=True)
 
 
 
