@@ -1125,8 +1125,10 @@ with tab_modello:
                                   .sort_values("Strength_mean_abs", ascending=False)
                                   .reset_index(drop=True))
 
-                # --- Layout Colonne (Matrice vs Grafo) ---
-                col_inter_mat, col_inter_empty, col_inter_graph = st.columns([4, 1, 4])
+
+                ###############################################################################
+                # --- Layout Colonne (Matrice vs Top classifica) ---
+                col_inter_mat, col_inter_empty, col_top_k_shap = st.columns([4, 1, 4])
 
                 with col_inter_mat:
                     st.markdown("### 🔗 Interaction Matrix (Mean Absolute Value)")
@@ -1140,9 +1142,21 @@ with tab_modello:
                     st.pyplot(fig_inter, use_container_width=True)
 
                     # Top 10 Lista
-                    #with st.expander("🔝 Top 10 Feature Interactions", expanded=False):
-                    st.markdown("### 🔝 Top 10 Feature Interactions")
-                    top_10_inter = inter_pairs_df.head(10)
+                with col_top_k_shap:
+                    st.markdown(f"### 🔝 Top Feature Interactions")
+                    top_k_inter = st.slider("Select Top K interactions:", 5, 30, 10, step=1, key='inter_top_k_slider')
+                   
+                    # Legenda
+                    st.markdown(
+                        """
+                        <div style="font-size: 13px; margin-bottom: 10px;">
+                            <span style="display:inline-block; width:20px; border-top:4px solid #E67E22; vertical-align:middle;"></span> Positive Avg. Interaction &nbsp;
+                            <span style="display:inline-block; width:20px; border-top:4px solid #2980B9; vertical-align:middle;"></span> Negative Avg. Interaction
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                    top_10_inter = inter_pairs_df.head(top_k_inter)
                     for _, row in top_10_inter.iterrows():
                         # Colori per positivo/negativo
                         color_bg = "#fef3eb" if row['Sign_mean'] >= 0 else "#eef9fd"
