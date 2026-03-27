@@ -600,7 +600,8 @@ def to_excel_download(df_input, df_importance, df_shap):
 
 
 # --- Struttura dell'App Streamlit (Tabs) ---
-tab_esplorazione, tab_modello, tab_drilldown, tab_relazioni, tab_scenario = st.tabs(["Data Upload & Exploration", "Global Model Analysis (SHAP)", "University Drill-Down", "Variable Relationships", "Scenario Analysis"])
+# tab_esplorazione, tab_modello, tab_drilldown, tab_relazioni, tab_scenario = st.tabs(["Data Upload & Exploration", "Global Model Analysis (SHAP)", "University Drill-Down", "Variable Relationships", "Scenario Analysis"])
+tab_esplorazione, tab_modello, tab_drilldown, tab_relazioni = st.tabs(["Data Upload & Exploration", "Global Model Analysis (SHAP)", "University Drill-Down", "Variable Relationships"])
 
 
 # -----------------------------------------------------
@@ -742,7 +743,7 @@ with tab_esplorazione:
             all_unis = sorted(df['School name'].unique())
             
             # Define benchmark options (excluding Luiss)
-            benchmark_options = [u for u in all_unis if u != luiss_name]
+            benchmark_options = ["None"] + [u for u in all_unis if u != luiss_name]
             
             # Auto-detect Bocconi index
             bocconi_indices = [i for i, s in enumerate(benchmark_options) if "Bocconi" in s]
@@ -754,7 +755,7 @@ with tab_esplorazione:
                 selected_benchmark = st.selectbox(
                     "Select Benchmark University for comparison:",
                     benchmark_options,
-                    index=default_bench_idx,
+                    index=0, #default_bench_idx,
                     key='ranking_benchmark_select'
                 )
                 # We define our target highlights here
@@ -840,14 +841,14 @@ with tab_esplorazione:
 
             with col_bench:
                 # 1. Selezione Benchmark - CHIAVE UNICA: 'dist_benchmark_select'
-                benchmark_options = sorted([u for u in df['School name'].unique() if u != luiss_name])
+                benchmark_options = ["None"] + sorted([u for u in df['School name'].unique() if u != luiss_name])
                 bocconi_indices = [i for i, s in enumerate(benchmark_options) if "Bocconi" in s]
                 default_bench_idx = bocconi_indices[0] if bocconi_indices else 0
 
                 selected_benchmark = st.selectbox(
                     "Select Benchmark University for comparison:",
                     benchmark_options,
-                    index=default_bench_idx,
+                    index=0, #default_bench_idx,
                     key='dist_benchmark_select'
                 )
 
@@ -867,28 +868,39 @@ with tab_esplorazione:
                 fig_dist = go.Figure()
                 
                 # 1. Elegant, Edge-Free Violin Plot
+                real_min = df[var].min()
+                real_max = df[var].max()
+                data_range = real_max - real_min
+                pad_margin = data_range * 0.02
+                current_bandwidth = 0.5 if data_range <= 100 else None
+                # 1. Elegant, Edge-Free Violin Plot (MODIFICATO)
                 fig_dist.add_trace(go.Violin(
-                    x=df[var],
-                    y=[0] * len(df),
-                    name="Density",
-                    orientation='h',
-                    side='both',
-                    line_color='white',
-                    line_width=0,
-                    fillcolor='rgba(180, 200, 230, 0.25)', 
-                    hoveron='violins',
-                    hoverinfo='x',
-                    box_visible=True,      
-                    box_width=0.4,         
-                    box_fillcolor='rgba(255, 255, 255, 0.5)', 
-                    box_line_color='#576574', 
-                    box_line_width=1,
-                    meanline_visible=True,
-                    meanline_color='#2c3e50',
-                    meanline_width=2,
-                    spanmode='soft',
-                    points=False
-                ))
+                x=df[var],
+                y=[0] * len(df),
+                name="Density",
+                orientation='h',
+                side='both',
+                line_width=0,
+                fillcolor='rgba(180, 200, 230, 0.25)', 
+                hoveron='violins',
+                hoverinfo='x',
+                
+                # --- APPLICAZIONE DINAMICA ---
+                bandwidth=current_bandwidth, 
+                spanmode='manual',
+                span=[real_min - pad_margin, real_max + pad_margin], 
+                # -----------------------------
+                
+                box_visible=True,      
+                box_width=0.4,         
+                box_fillcolor='rgba(255, 255, 255, 0.5)', 
+                box_line_color='#576574', 
+                box_line_width=1,
+                meanline_visible=True,
+                meanline_color='#2c3e50',
+                meanline_width=2,
+                points=False
+            ))
 
                 # 2. Luiss marker
                 if luiss_name in df['School name'].values:
@@ -901,13 +913,16 @@ with tab_esplorazione:
                     ))
 
                 # 3. Benchmark marker
-                val_b = df[df['School name'] == selected_benchmark][var].values[0]
-                fig_dist.add_trace(go.Scatter(
-                    x=[val_b], y=[0],
-                    mode='markers', name=selected_benchmark,
-                    marker=dict(color=color_benchmark, size=20, symbol='x', line=dict(width=2, color='white')),
-                    hovertemplate=f"<b>{selected_benchmark}</b><br>{var}: %{{x}}<extra></extra>"
-                ))
+                if selected_benchmark != "None":
+                    val_b = df[df['School name'] == selected_benchmark][var].values[0]
+                    fig_dist.add_trace(go.Scatter(
+                        x=[val_b], y=[0],
+                        mode='markers', name=selected_benchmark,
+                        marker=dict(color=color_benchmark, size=20, symbol='x', line=dict(width=2, color='white')),
+                        hovertemplate=f"<b>{selected_benchmark}</b><br>{var}: %{{x}}<extra></extra>"
+                    ))
+
+                
 
                 fig_dist.update_layout(
                     title=dict(text=f"{var}", font=dict(size=18)),
@@ -921,7 +936,13 @@ with tab_esplorazione:
                     showlegend=True,
                     legend=dict(orientation="h", yanchor="bottom", y=1.1, xanchor="center", x=0.5)
                 )
+                # # --- RITAGLIO ASSE X ---
+                # fig_dist.update_xaxes(
+                #     range=[real_min, real_max], # Taglia esattamente ai bordi reali
+                #     showgrid=True, gridcolor='#f2f2f2', zeroline=False
+                # )
                 
+                # st.plotly_chart(fig_dist, use_container_width=True)
                 fig_dist.update_xaxes(showgrid=True, gridcolor='#f2f2f2', zeroline=False)
                 st.plotly_chart(fig_dist, use_container_width=True)
 
@@ -1883,195 +1904,195 @@ with tab_relazioni:
             )
             components.html(html_content_mi, height=750, scrolling=True)
 
-with tab_scenario:
-    st.markdown("---")
-    st.markdown("## 🧮 Scenario Analysis")
-    st.caption("Modify the feature values to simulate alternative scenarios and see the impact on the predicted Rank.")
-    if st.session_state.get('shap_df') is None:
-        st.warning("To perform Scenario Analysis, you must first train the model in the 'Global Model Analysis (SHAP)' tab.")
-    else:
-        # Si assume che le librerie necessarie (come pandas, numpy) siano già importate altrove.
-        import numpy as np # Necessario per np.array
-        import pandas as pd # Aggiunto per sicurezza se non globale
+# with tab_scenario:
+#     st.markdown("---")
+#     st.markdown("## 🧮 Scenario Analysis")
+#     st.caption("Modify the feature values to simulate alternative scenarios and see the impact on the predicted Rank.")
+#     if st.session_state.get('shap_df') is None:
+#         st.warning("To perform Scenario Analysis, you must first train the model in the 'Global Model Analysis (SHAP)' tab.")
+#     else:
+#         # Si assume che le librerie necessarie (come pandas, numpy) siano già importate altrove.
+#         import numpy as np # Necessario per np.array
+#         import pandas as pd # Aggiunto per sicurezza se non globale
         
-        # --- Estrai dati ---
-        df = st.session_state['df']
-        df_reset = df.reset_index(drop=True)
-        feature_cols = st.session_state['model_results']['feature_cols']
-        shap_data = st.session_state['shap_data']
-        model = shap_data['model']
-        X = shap_data['X']
+#         # --- Estrai dati ---
+#         df = st.session_state['df']
+#         df_reset = df.reset_index(drop=True)
+#         feature_cols = st.session_state['model_results']['feature_cols']
+#         shap_data = st.session_state['shap_data']
+#         model = shap_data['model']
+#         X = shap_data['X']
 
-        # --- Selezione università ---
-        col_select_uni_scenario, col_empty, col_reset = st.columns([2, 3, 1])
-        with col_select_uni_scenario:
-            uni_names = sorted(df['School name'].unique())
-            luiss_name = "Luiss University/Luiss Business School"
-            default_index = list(uni_names).index(luiss_name) if luiss_name in uni_names else 0
-            selected_uni_name = st.selectbox("Select University:", uni_names, index=default_index, key='uni_scenario_select')
-        uni_idx = df_reset.index[df_reset['School name'] == selected_uni_name][0]
-        uni_score_original = float(df_reset.iloc[uni_idx]['Rank'])
-        ft_rank_original = int(df_reset['Rank'].max() - uni_score_original + 1)
-        # original feature values
-        df_features = pd.DataFrame(X, columns=feature_cols)
-        original_values = {col: float(df_features.iloc[uni_idx][col]) for col in feature_cols}
+#         # --- Selezione università ---
+#         col_select_uni_scenario, col_empty, col_reset = st.columns([2, 3, 1])
+#         with col_select_uni_scenario:
+#             uni_names = sorted(df['School name'].unique())
+#             luiss_name = "Luiss University/Luiss Business School"
+#             default_index = list(uni_names).index(luiss_name) if luiss_name in uni_names else 0
+#             selected_uni_name = st.selectbox("Select University:", uni_names, index=default_index, key='uni_scenario_select')
+#         uni_idx = df_reset.index[df_reset['School name'] == selected_uni_name][0]
+#         uni_score_original = float(df_reset.iloc[uni_idx]['Rank'])
+#         ft_rank_original = int(df_reset['Rank'].max() - uni_score_original + 1)
+#         # original feature values
+#         df_features = pd.DataFrame(X, columns=feature_cols)
+#         original_values = {col: float(df_features.iloc[uni_idx][col]) for col in feature_cols}
         
-        # Inizializza o resetta scenario_values quando cambia università
-        if 'last_selected_uni' not in st.session_state or selected_uni_name != st.session_state['last_selected_uni']:
-            st.session_state['scenario_values'] = original_values.copy()
-            st.session_state['last_selected_uni'] = selected_uni_name
-            st.session_state['scenario_result'] = None
-            # IMPORTANTE: Resetta anche le chiavi degli slider per la nuova università
-            for feature in feature_cols:
-                if f"slider_{feature}" in st.session_state:
-                    del st.session_state[f"slider_{feature}"]
+#         # Inizializza o resetta scenario_values quando cambia università
+#         if 'last_selected_uni' not in st.session_state or selected_uni_name != st.session_state['last_selected_uni']:
+#             st.session_state['scenario_values'] = original_values.copy()
+#             st.session_state['last_selected_uni'] = selected_uni_name
+#             st.session_state['scenario_result'] = None
+#             # IMPORTANTE: Resetta anche le chiavi degli slider per la nuova università
+#             for feature in feature_cols:
+#                 if f"slider_{feature}" in st.session_state:
+#                     del st.session_state[f"slider_{feature}"]
             
-        def reset_scenario():
-            """Funzione di callback per resettare i valori di scenario e il risultato."""
-            st.session_state['scenario_values'] = original_values.copy()
-            st.session_state['scenario_result'] = None
-            # IMPORTANTE: Resetta anche le chiavi degli slider al valore originale
-            for feature in feature_cols:
-                #st.session_state[f"slider_{feature}"] = original_values[feature]
-                if f"slider_{feature}" in st.session_state:
-                    del st.session_state[f"slider_{feature}"]
+#         def reset_scenario():
+#             """Funzione di callback per resettare i valori di scenario e il risultato."""
+#             st.session_state['scenario_values'] = original_values.copy()
+#             st.session_state['scenario_result'] = None
+#             # IMPORTANTE: Resetta anche le chiavi degli slider al valore originale
+#             for feature in feature_cols:
+#                 #st.session_state[f"slider_{feature}"] = original_values[feature]
+#                 if f"slider_{feature}" in st.session_state:
+#                     del st.session_state[f"slider_{feature}"]
 
-        with col_reset:
-            st.markdown(""); st.markdown("")
-            if st.button("🔄 Reset to Original Values", use_container_width=True, on_click=reset_scenario):
-                # If reset is called (callback), the state is already updated.
-                # Here we do nothing.
-                pass
-        st.markdown("---")
+#         with col_reset:
+#             st.markdown(""); st.markdown("")
+#             if st.button("🔄 Reset to Original Values", use_container_width=True, on_click=reset_scenario):
+#                 # If reset is called (callback), the state is already updated.
+#                 # Here we do nothing.
+#                 pass
+#         st.markdown("---")
         
-        # --- Layout colonne ---
-        col_scores, col_features = st.columns([1, 4])
+#         # --- Layout colonne ---
+#         col_scores, col_features = st.columns([1, 4])
         
-        with col_features:
-            st.subheader("⚙️ Modify Feature")
-            st.caption("Set the values and press 'Calculate Scenario' to update the score.")
+#         with col_features:
+#             st.subheader("⚙️ Modify Feature")
+#             st.caption("Set the values and press 'Calculate Scenario' to update the score.")
 
-            if 'scenario_result' not in st.session_state:
-                st.session_state['scenario_result'] = None
+#             if 'scenario_result' not in st.session_state:
+#                 st.session_state['scenario_result'] = None
                 
-            with st.form("scenario_form", clear_on_submit=False):
-                col_empty_form, col_submit = st.columns([1, 4])
-                with col_submit:
-                    submitted = st.form_submit_button("🚀 Calculate Scenario",
-                                                       use_container_width=True,
-                                                       type='primary')
+#             with st.form("scenario_form", clear_on_submit=False):
+#                 col_empty_form, col_submit = st.columns([1, 4])
+#                 with col_submit:
+#                     submitted = st.form_submit_button("🚀 Calculate Scenario",
+#                                                        use_container_width=True,
+#                                                        type='primary')
                 
-                # LOOP SLIDER dentro la form
-                for feature in feature_cols:
-                    col_label, col_slider = st.columns([1, 4])
+#                 # LOOP SLIDER dentro la form
+#                 for feature in feature_cols:
+#                     col_label, col_slider = st.columns([1, 4])
                     
-                    # Calcolo min/max/step
-                    if feature == 'Weighted salary (US$)':
-                        min_val = float(round(float(df_features[feature].min()*0.8) / 100) * 100)
-                        max_val = float(round(float(df_features[feature].max()*1.2) / 100) * 100)
-                        step = 100.0
-                    else:
-                        min_val, max_val, step = 0.0, 100.0, 1.0
+#                     # Calcolo min/max/step
+#                     if feature == 'Weighted salary (US$)':
+#                         min_val = float(round(float(df_features[feature].min()*0.8) / 100) * 100)
+#                         max_val = float(round(float(df_features[feature].max()*1.2) / 100) * 100)
+#                         step = 100.0
+#                     else:
+#                         min_val, max_val, step = 0.0, 100.0, 1.0
                         
-                    original_val = float(original_values[feature])
+#                     original_val = float(original_values[feature])
                     
-                    # Il valore iniziale DEVE essere preso dalla chiave del widget
-                    # se è già in sessione, altrimenti da scenario_values
-                    if f"slider_{feature}" in st.session_state and selected_uni_name == st.session_state['last_selected_uni']:
-                        # Uso il valore memorizzato nella chiave del widget se esiste
-                        current_val = st.session_state[f"slider_{feature}"]
-                    else:
-                        # Altrimenti, usa il valore di scenario (che è l'originale al primo load/cambio università)
-                        current_val = float(st.session_state['scenario_values'].get(feature, original_val))
+#                     # Il valore iniziale DEVE essere preso dalla chiave del widget
+#                     # se è già in sessione, altrimenti da scenario_values
+#                     if f"slider_{feature}" in st.session_state and selected_uni_name == st.session_state['last_selected_uni']:
+#                         # Uso il valore memorizzato nella chiave del widget se esiste
+#                         current_val = st.session_state[f"slider_{feature}"]
+#                     else:
+#                         # Altrimenti, usa il valore di scenario (che è l'originale al primo load/cambio università)
+#                         current_val = float(st.session_state['scenario_values'].get(feature, original_val))
 
                     
-                    with col_label:
-                        st.markdown(f"<div style='padding-top:4px;'><strong>{feature}</strong></div>", unsafe_allow_html=True)
+#                     with col_label:
+#                         st.markdown(f"<div style='padding-top:4px;'><strong>{feature}</strong></div>", unsafe_allow_html=True)
                         
-                    with col_slider:
-                        st.slider(
-                            label=feature, #"",
-                            min_value=float(min_val),
-                            max_value=float(max_val),
-                            value=current_val, # Usa il valore correttamente inizializzato
-                            step=float(step),
-                            key=f"slider_{feature}",
-                            help=f"Original value: {original_val}",
-                            label_visibility="collapsed" #"visible"
-                        )
+#                     with col_slider:
+#                         st.slider(
+#                             label=feature, #"",
+#                             min_value=float(min_val),
+#                             max_value=float(max_val),
+#                             value=current_val, # Usa il valore correttamente inizializzato
+#                             step=float(step),
+#                             key=f"slider_{feature}",
+#                             help=f"Original value: {original_val}",
+#                             label_visibility="collapsed" #"visible"
+#                         )
                     
-            # Gestione submit (fuori dal with st.form)
-            if submitted:
-                # 1. Aggiorna lo stato dei valori di scenario con i valori finali del form
-                for feature in feature_cols:
-                    # I valori sono già nelle chiavi degli slider, li usiamo
-                    st.session_state['scenario_values'][feature] = st.session_state[f"slider_{feature}"]
+#             # Gestione submit (fuori dal with st.form)
+#             if submitted:
+#                 # 1. Aggiorna lo stato dei valori di scenario con i valori finali del form
+#                 for feature in feature_cols:
+#                     # I valori sono già nelle chiavi degli slider, li usiamo
+#                     st.session_state['scenario_values'][feature] = st.session_state[f"slider_{feature}"]
                 
-                # 2. Calcola la previsione
-                scenario_X = np.array(
-                    [st.session_state['scenario_values'][col] for col in feature_cols],
-                    dtype=float
-                ).reshape(1, -1)
-                predicted_score = float(model.predict(scenario_X)[0])
-                predicted_rank = int(df_reset['Rank'].max() - predicted_score + 1)
-                score_diff = predicted_score - float(uni_score_original)
-                rank_diff = int(ft_rank_original - predicted_rank)
+#                 # 2. Calcola la previsione
+#                 scenario_X = np.array(
+#                     [st.session_state['scenario_values'][col] for col in feature_cols],
+#                     dtype=float
+#                 ).reshape(1, -1)
+#                 predicted_score = float(model.predict(scenario_X)[0])
+#                 predicted_rank = int(df_reset['Rank'].max() - predicted_score + 1)
+#                 score_diff = predicted_score - float(uni_score_original)
+#                 rank_diff = int(ft_rank_original - predicted_rank)
                 
-                # 3. Salva risultato in sessione
-                st.session_state['scenario_result'] = {
-                    "predicted_score": predicted_score,
-                    "predicted_rank": predicted_rank,
-                    "score_diff": score_diff,
-                    "rank_diff": rank_diff
-                }
+#                 # 3. Salva risultato in sessione
+#                 st.session_state['scenario_result'] = {
+#                     "predicted_score": predicted_score,
+#                     "predicted_rank": predicted_rank,
+#                     "score_diff": score_diff,
+#                     "rank_diff": rank_diff
+#                 }
 
-        # --- COLONNA SCORE (Nessuna modifica necessaria qui) ---
-        with col_scores:
-            st.subheader("📊 Results")
-            # box punteggio originale
-            st.markdown(f"""
-                <div style="background-color:#f0f2f6; padding:20px; border-radius:10px; margin-bottom:15px;">
-                    <h4 style="margin:0; color:#555;">Original Score</h4>
-                    <h2 style="margin:10px 0; color:#333;">{uni_score_original:.2f}</h2>
-                </div>
-            """, unsafe_allow_html=True)
+#         # --- COLONNA SCORE (Nessuna modifica necessaria qui) ---
+#         with col_scores:
+#             st.subheader("📊 Results")
+#             # box punteggio originale
+#             st.markdown(f"""
+#                 <div style="background-color:#f0f2f6; padding:20px; border-radius:10px; margin-bottom:15px;">
+#                     <h4 style="margin:0; color:#555;">Original Score</h4>
+#                     <h2 style="margin:10px 0; color:#333;">{uni_score_original:.2f}</h2>
+#                 </div>
+#             """, unsafe_allow_html=True)
             
-            if st.session_state['scenario_result'] is None:
-                st.info("Set the values and press **Calculate Scenario**.")
-            else:
-                predicted_score = st.session_state['scenario_result']['predicted_score']
-                predicted_rank = st.session_state['scenario_result']['predicted_rank']
-                score_diff = st.session_state['scenario_result']['score_diff']
-                rank_diff = st.session_state['scenario_result']['rank_diff']
+#             if st.session_state['scenario_result'] is None:
+#                 st.info("Set the values and press **Calculate Scenario**.")
+#             else:
+#                 predicted_score = st.session_state['scenario_result']['predicted_score']
+#                 predicted_rank = st.session_state['scenario_result']['predicted_rank']
+#                 score_diff = st.session_state['scenario_result']['score_diff']
+#                 rank_diff = st.session_state['scenario_result']['rank_diff']
                 
-                invert_rank = st.session_state.get("invert_rank", True)
+#                 invert_rank = st.session_state.get("invert_rank", True)
 
-                if abs(score_diff) < 0.5:
-                    box_color, border_color, icon, status = "#e8f4f8", "#b0c4de", "➡️", ""
-                elif score_diff > 0 and invert_rank==True:
-                    box_color, border_color, icon, status = "#d4f8d4", "#8cd98c", "📈", ""
-                elif score_diff < 0 and invert_rank==True:
-                    box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
+#                 if abs(score_diff) < 0.5:
+#                     box_color, border_color, icon, status = "#e8f4f8", "#b0c4de", "➡️", ""
+#                 elif score_diff > 0 and invert_rank==True:
+#                     box_color, border_color, icon, status = "#d4f8d4", "#8cd98c", "📈", ""
+#                 elif score_diff < 0 and invert_rank==True:
+#                     box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
 
-                elif score_diff < 0 and invert_rank==False:
-                    box_color, border_color, icon, status = "#d4f8d4", "#8cd98c", "📈", ""
-                elif score_diff > 0 and invert_rank==False:
-                    box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
+#                 elif score_diff < 0 and invert_rank==False:
+#                     box_color, border_color, icon, status = "#d4f8d4", "#8cd98c", "📈", ""
+#                 elif score_diff > 0 and invert_rank==False:
+#                     box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
 
-                # else:
-                #     box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
+#                 # else:
+#                 #     box_color, border_color, icon, status = "#ffe6e6", "#ff9999", "📉", ""
                     
-                st.markdown(f"""
-                    <div style="background-color:{box_color}; padding:20px; border-radius:10px; border:2px solid {border_color}; margin-bottom:15px;">
-                        <h4 style="margin:0; color:#555;">{icon} Predicted Score</h4>
-                        <h2 style="margin:10px 0; color:#333;">{predicted_score:.2f}</h2>
-                    </div>
-                """, unsafe_allow_html=True)
+#                 st.markdown(f"""
+#                     <div style="background-color:{box_color}; padding:20px; border-radius:10px; border:2px solid {border_color}; margin-bottom:15px;">
+#                         <h4 style="margin:0; color:#555;">{icon} Predicted Score</h4>
+#                         <h2 style="margin:10px 0; color:#333;">{predicted_score:.2f}</h2>
+#                     </div>
+#                 """, unsafe_allow_html=True)
                 
-                st.markdown(f"""
-                    <div style="background-color:#fff; padding:15px; border-radius:10px; border:2px solid {border_color};">
-                        <h4 style="margin:0 0 10px 0; color:#555;">Variation</h4>
-                        <p style="margin:5px 0;"><strong>Score:</strong> {score_diff:+.2f} points</p>
-                        <p style="margin:10px 0 0 0; color:#666; font-style:italic;">{status}</p>
-                    </div>
-                """, unsafe_allow_html=True)
+#                 st.markdown(f"""
+#                     <div style="background-color:#fff; padding:15px; border-radius:10px; border:2px solid {border_color};">
+#                         <h4 style="margin:0 0 10px 0; color:#555;">Variation</h4>
+#                         <p style="margin:5px 0;"><strong>Score:</strong> {score_diff:+.2f} points</p>
+#                         <p style="margin:10px 0 0 0; color:#666; font-style:italic;">{status}</p>
+#                     </div>
+#                 """, unsafe_allow_html=True)
