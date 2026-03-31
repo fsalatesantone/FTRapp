@@ -1082,211 +1082,124 @@ with tab_modello:
                         st.pyplot(fig, use_container_width=True)
 
 
-            # --- Contenitore 4: SHAP Interaction Values ---
-            with st.expander("🕸️ SHAP Feature Interactions Analysis", expanded=True):
-                st.subheader("SHAP Feature Interaction Analysis")
+            # # --- Contenitore 4: SHAP Interaction Values ---
+            # with st.expander("🕸️ SHAP Feature Interactions Analysis", expanded=True):
+            #     st.subheader("SHAP Feature Interaction Analysis")
 
-                popover_shap_inter = st.popover("ℹ️ SHAP Feature Interaction Info")
-                with popover_shap_inter:
-                    st.caption("📘 SHAP Feature Interaction")
-                    st.markdown("""
-                    ### 📘 SHAP Feature Interaction
-                    In complex predictive models, the impact of a single variable on the final outcome is rarely entirely independent. Often, the true effect of one feature depends heavily on the specific value of another. 
-                    While standard SHAP analysis calculates the overall contribution of each feature, **SHAP Interaction Values** allow us to decompose this contribution. They isolate the **main effect** (the feature acting independently) from the **interaction effect** (the feature's impact when coupled with another specific variable).
+            #     popover_shap_inter = st.popover("ℹ️ SHAP Feature Interaction Info")
+            #     with popover_shap_inter:
+            #         st.caption("📘 SHAP Feature Interaction")
+            #         st.markdown("""
+            #         ### 📘 SHAP Feature Interaction
+            #         In complex predictive models, the impact of a single variable on the final outcome is rarely entirely independent. Often, the true effect of one feature depends heavily on the specific value of another. 
+            #         While standard SHAP analysis calculates the overall contribution of each feature, **SHAP Interaction Values** allow us to decompose this contribution. They isolate the **main effect** (the feature acting independently) from the **interaction effect** (the feature's impact when coupled with another specific variable).
                     
-                    #### 📊 How to Interpret the Analysis
-                    * **Interaction Strength (Magnitude):** Indicated by matrix values and graph edge thickness. Higher absolute values denote a strong coupled relationship, signifying that the model relies heavily on the specific combination of these features rather than their isolated contributions.
+            #         #### 📊 How to Interpret the Analysis
+            #         * **Interaction Strength (Magnitude):** Indicated by matrix values and graph edge thickness. Higher absolute values denote a strong coupled relationship, signifying that the model relies heavily on the specific combination of these features rather than their isolated contributions.
 
-                    * **Direction of the Effect (Sign):** Indicated by color coding.
-                        * **Positive Interaction:** Highlights a synergy. The combined presence of the features amplifies their impact, yielding a score higher than the sum of their individual effects.
-                        * **Negative Interaction:** Highlights an antagonistic relationship. One feature dampens the impact of the other, resulting in a lower-than-expected combined effect.                    
-                    """)
+            #         * **Direction of the Effect (Sign):** Indicated by color coding.
+            #             * **Positive Interaction:** Highlights a synergy. The combined presence of the features amplifies their impact, yielding a score higher than the sum of their individual effects.
+            #             * **Negative Interaction:** Highlights an antagonistic relationship. One feature dampens the impact of the other, resulting in a lower-than-expected combined effect.                    
+            #         """)
 
-                # Assicuriamoci che le variabili siano disponibili
-                shap_data = st.session_state['shap_data']
-                explainer = shap_data['explainer']
-                X = shap_data['X']
-                feature_cols = st.session_state['model_results']['feature_cols']
-                current_perimeter = st.session_state.get('perimeter', 'custom')
+            #     # Assicuriamoci che le variabili siano disponibili
+            #     shap_data = st.session_state['shap_data']
+            #     explainer = shap_data['explainer']
+            #     X = shap_data['X']
+            #     feature_cols = st.session_state['model_results']['feature_cols']
+            #     current_perimeter = st.session_state.get('perimeter', 'custom')
 
-                # 1. Calcolo (con caching in session state per performance)
-                # Ora controlliamo il perimetro corrente invece di selected_uni_name
-                if 'shap_inter' not in st.session_state or st.session_state.get('last_inter_calc') != current_perimeter:
-                    with st.spinner("Calculating SHAP interaction values (this might take a few seconds)..."):
-                        # Calcola interazioni (restituisce array 3D: n_obs x n_feat x n_feat)
-                        shap_inter = explainer.shap_interaction_values(X)
-                        st.session_state['shap_inter'] = shap_inter
-                        st.session_state['last_inter_calc'] = current_perimeter
+            #     # 1. Calcolo (con caching in session state per performance)
+            #     # Ora controlliamo il perimetro corrente invece di selected_uni_name
+            #     if 'shap_inter' not in st.session_state or st.session_state.get('last_inter_calc') != current_perimeter:
+            #         with st.spinner("Calculating SHAP interaction values (this might take a few seconds)..."):
+            #             # Calcola interazioni (restituisce array 3D: n_obs x n_feat x n_feat)
+            #             shap_inter = explainer.shap_interaction_values(X)
+            #             st.session_state['shap_inter'] = shap_inter
+            #             st.session_state['last_inter_calc'] = current_perimeter
                 
-                shap_inter = st.session_state['shap_inter']
-                p = len(feature_cols)
+            #     shap_inter = st.session_state['shap_inter']
+            #     p = len(feature_cols)
 
-                # 2. Aggregazioni Globali
-                inter_abs_mean = np.abs(shap_inter).mean(axis=0)   # Forza dell'interazione
-                inter_sign_mean = shap_inter.mean(axis=0)          # Direzione (segno) dell'interazione
+            #     # 2. Aggregazioni Globali
+            #     inter_abs_mean = np.abs(shap_inter).mean(axis=0)   # Forza dell'interazione
+            #     inter_sign_mean = shap_inter.mean(axis=0)          # Direzione (segno) dell'interazione
                 
-                # Rimuovi i main effects dalla diagonale per concentrarci solo sulle interazioni pure
-                np.fill_diagonal(inter_abs_mean, 0.0)
-                np.fill_diagonal(inter_sign_mean, 0.0)
+            #     # Rimuovi i main effects dalla diagonale per concentrarci solo sulle interazioni pure
+            #     np.fill_diagonal(inter_abs_mean, 0.0)
+            #     np.fill_diagonal(inter_sign_mean, 0.0)
 
-                inter_matrix = pd.DataFrame(inter_abs_mean, index=feature_cols, columns=feature_cols)
+            #     inter_matrix = pd.DataFrame(inter_abs_mean, index=feature_cols, columns=feature_cols)
 
-                # Generazione lista delle coppie
-                pairs = []
-                for i in range(p):
-                    for j in range(i + 1, p):
-                        pairs.append((
-                            feature_cols[i], 
-                            feature_cols[j], 
-                            inter_abs_mean[i, j], 
-                            inter_sign_mean[i, j]
-                        ))
+            #     # Generazione lista delle coppie
+            #     pairs = []
+            #     for i in range(p):
+            #         for j in range(i + 1, p):
+            #             pairs.append((
+            #                 feature_cols[i], 
+            #                 feature_cols[j], 
+            #                 inter_abs_mean[i, j], 
+            #                 inter_sign_mean[i, j]
+            #             ))
 
-                inter_pairs_df = (pd.DataFrame(pairs, columns=["Feature 1", "Feature 2", "Strength_mean_abs", "Sign_mean"])
-                                  .sort_values("Strength_mean_abs", ascending=False)
-                                  .reset_index(drop=True))
+            #     inter_pairs_df = (pd.DataFrame(pairs, columns=["Feature 1", "Feature 2", "Strength_mean_abs", "Sign_mean"])
+            #                       .sort_values("Strength_mean_abs", ascending=False)
+            #                       .reset_index(drop=True))
 
 
-                ###############################################################################
-                # --- Layout Colonne (Matrice vs Top classifica) ---
-                col_inter_mat, col_inter_empty, col_top_k_shap = st.columns([4, 1, 4])
+            #     ###############################################################################
+            #     # --- Layout Colonne (Matrice vs Top classifica) ---
+            #     col_inter_mat, col_inter_empty, col_top_k_shap = st.columns([4, 1, 4])
 
-                with col_inter_mat:
-                    st.markdown("### 🔗 Interaction Matrix (Mean Absolute Value)")
+            #     with col_inter_mat:
+            #         st.markdown("### 🔗 Interaction Matrix (Mean Absolute Value)")
                     
-                    # Heatmap
-                    fig_inter, ax_inter = plt.subplots(figsize=(8, 7))
-                    sns.heatmap(inter_matrix, cmap="YlGnBu", linewidths=0.2, ax=ax_inter, 
-                                xticklabels=True, yticklabels=True)
-                    # Ottimizzazione font asse
-                    ax_inter.tick_params(axis='both', which='major', labelsize=8)
-                    st.pyplot(fig_inter, use_container_width=True)
+            #         # Heatmap
+            #         fig_inter, ax_inter = plt.subplots(figsize=(8, 7))
+            #         sns.heatmap(inter_matrix, cmap="YlGnBu", linewidths=0.2, ax=ax_inter, 
+            #                     xticklabels=True, yticklabels=True)
+            #         # Ottimizzazione font asse
+            #         ax_inter.tick_params(axis='both', which='major', labelsize=8)
+            #         st.pyplot(fig_inter, use_container_width=True)
 
-                    # Top 10 Lista
-                with col_top_k_shap:
-                    st.markdown(f"### 🔝 Top Feature Interactions")
-                    top_k_inter = st.slider("Select Top K interactions:", 5, 30, 10, step=1, key='inter_top_k_slider')
+            #         # Top 10 Lista
+            #     with col_top_k_shap:
+            #         st.markdown(f"### 🔝 Top Feature Interactions")
+            #         top_k_inter = st.slider("Select Top K interactions:", 5, 30, 10, step=1, key='inter_top_k_slider')
                    
-                    # Legenda
-                    st.markdown(
-                        """
-                        <div style="font-size: 13px; margin-bottom: 10px;">
-                            <span style="display:inline-block; width:20px; border-top:4px solid #E67E22; vertical-align:middle;"></span> Positive Avg. Interaction &nbsp;
-                            <span style="display:inline-block; width:20px; border-top:4px solid #2980B9; vertical-align:middle;"></span> Negative Avg. Interaction
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    top_10_inter = inter_pairs_df.head(top_k_inter)
-                    for _, row in top_10_inter.iterrows():
-                        # Colori per positivo/negativo
-                        color_bg = "#fef3eb" if row['Sign_mean'] >= 0 else "#eef9fd"
-                        border_color = "#F1B17C" if row['Sign_mean'] >= 0 else "#87D8F7"
-                        value_bg = "#E67E22" if row['Sign_mean'] >= 0 else "#2980B9"
+            #         # Legenda
+            #         st.markdown(
+            #             """
+            #             <div style="font-size: 13px; margin-bottom: 10px;">
+            #                 <span style="display:inline-block; width:20px; border-top:4px solid #E67E22; vertical-align:middle;"></span> Positive Avg. Interaction &nbsp;
+            #                 <span style="display:inline-block; width:20px; border-top:4px solid #2980B9; vertical-align:middle;"></span> Negative Avg. Interaction
+            #             </div>
+            #             """,
+            #             unsafe_allow_html=True
+            #         )
+            #         top_10_inter = inter_pairs_df.head(top_k_inter)
+            #         for _, row in top_10_inter.iterrows():
+            #             # Colori per positivo/negativo
+            #             color_bg = "#fef3eb" if row['Sign_mean'] >= 0 else "#eef9fd"
+            #             border_color = "#F1B17C" if row['Sign_mean'] >= 0 else "#87D8F7"
+            #             value_bg = "#E67E22" if row['Sign_mean'] >= 0 else "#2980B9"
 
-                        st.markdown(
-                            f"""
-                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
-                                <div style="flex:1; background-color:{color_bg}; padding:6px 6px; border-radius:6px;
-                                            border:1px solid {border_color}; color:#1a1a1a; font-size: 14px;">
-                                    {row['Feature 1']} ↔ {row['Feature 2']}
-                                </div>
-                                <div style="width:5px;"></div>
-                                <div style="width:75px; text-align:center; background-color:{value_bg}; color:white;
-                                            padding:6px 0; border-radius:6px; font-family:monospace; font-size: 14px;">
-                                    {row['Strength_mean_abs']:.3f}
-                                </div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True
-                        )
-
-                # with col_inter_graph:
-                #     st.markdown("### 🕸️ Interaction Network Graph")
-                    
-                #     col_slider_inter, col_stat_inter = st.columns([3, 1])
-                #     with col_slider_inter:
-                #         # Chiave univoca per lo slider
-                #         top_k_inter = st.slider("Select Top K interactions to plot:", 5, 30, 10, step=1, key='inter_top_k_slider')
-                    
-                #     # Preparazione Dati Grafo
-                #     top_df = inter_pairs_df.head(top_k_inter).copy()
-                #     G_inter = nx.Graph()
-
-                #     nodes = pd.unique(top_df[["Feature 1", "Feature 2"]].values.ravel("K"))
-                #     for n in nodes:
-                #         G_inter.add_node(n)
-
-                #     for _, row in top_df.iterrows():
-                #         G_inter.add_edge(row["Feature 1"], row["Feature 2"], 
-                #                          strength=float(row["Strength_mean_abs"]), 
-                #                          sign_mean=float(row["Sign_mean"]))
-
-                #     # Inizializzazione PyVis
-                #     net_inter = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="black", directed=False)
-
-                #     # Colori nodi
-                #     var_type = build_var_type_map(df)
-                #     NODE_COLORS = {
-                #         "Alumni survey": "#87D8F7",
-                #         "School survey": "#0b3d91",
-                #         "Unknown": "#81848b"
-                #     }
-
-                #     for node in G_inter.nodes:
-                #         group = var_type.get(node, "Unknown")
-                #         net_inter.add_node(
-                #             node,
-                #             label=node,
-                #             title=f"{node}",
-                #             color=NODE_COLORS.get(group, "#bfc7d5")
-                #         )
-
-                #     # Scaling archi
-                #     max_strength = top_df["Strength_mean_abs"].max() if not top_df.empty else 1.0
-                #     min_width, max_width = 1.0, 10.0
-
-                #     for u, v, d in G_inter.edges(data=True):
-                #         strength = d["strength"]
-                #         sign_mean = d["sign_mean"]
-                #         width = min_width + (strength / max_strength) * (max_width - min_width) if max_strength > 0 else min_width
-                #         color = "#F1B17C" if sign_mean >= 0 else "#87D8F7"
-                #         title_html = (f"Strength: {strength:.3f}")
-                #         net_inter.add_edge(u, v, value=strength, title=title_html, color=color, width=width)
-
-                #     with col_stat_inter:
-                #         st.caption(f"Nodes: {len(nodes)}<br>Edges: {len(top_df)}", unsafe_allow_html=True)
-
-                #     # Rendering HTML
-                #     net_inter.force_atlas_2based()
-                #     html_content_inter = net_inter.generate_html()
-                #     html_content_inter = html_content_inter.replace(
-                #         "</body>",
-                #         """
-                #         <script type="text/javascript">
-                #             window.addEventListener('load', () => {
-                #                 if (typeof network !== 'undefined') { network.fit(); }
-                #             });
-                #         </script>
-                #         </body>
-                #         """
-                #     )
-                    
-                #     # Legenda
-                #     st.markdown(
-                #         """
-                #         <div style="font-size: 13px; margin-bottom: 10px;">
-                #             <span style="color:#8fd3ff">●</span> Alumni survey &nbsp; 
-                #             <span style="color:#0b3d91">●</span> School survey &nbsp; <br>
-                #             <span style="display:inline-block; width:20px; border-top:4px solid #F1B17C; vertical-align:middle;"></span> Positive Avg. Interaction &nbsp;
-                #             <span style="display:inline-block; width:20px; border-top:4px solid #87D8F7; vertical-align:middle;"></span> Negative Avg. Interaction
-                #         </div>
-                #         """,
-                #         unsafe_allow_html=True
-                #     )
-                    
-                #     components.html(html_content_inter, height=650, scrolling=True)
-
+            #             st.markdown(
+            #                 f"""
+            #                 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;">
+            #                     <div style="flex:1; background-color:{color_bg}; padding:6px 6px; border-radius:6px;
+            #                                 border:1px solid {border_color}; color:#1a1a1a; font-size: 14px;">
+            #                         {row['Feature 1']} ↔ {row['Feature 2']}
+            #                     </div>
+            #                     <div style="width:5px;"></div>
+            #                     <div style="width:75px; text-align:center; background-color:{value_bg}; color:white;
+            #                                 padding:6px 0; border-radius:6px; font-family:monospace; font-size: 14px;">
+            #                         {row['Strength_mean_abs']:.3f}
+            #                     </div>
+            #                 </div>
+            #                 """,
+            #                 unsafe_allow_html=True
+            #             )
 
 
         else:
